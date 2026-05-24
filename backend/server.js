@@ -4,9 +4,16 @@ const cron = require('node-cron');
 require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
+const twilio = require('twilio');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+// Twilio Setup
+const accountSid = process.env.TWILIO_ACCOUNT_SID || 'your_account_sid';
+const authToken = process.env.TWILIO_AUTH_TOKEN || 'your_auth_token';
+const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER || 'whatsapp:+14155238886'; // default sandbox number
+const twilioClient = (accountSid !== 'your_account_sid') ? twilio(accountSid, authToken) : null;
 
 // Middleware
 app.use(cors());
@@ -35,15 +42,15 @@ const initializeDb = () => {
     fs.writeFileSync(usersDbPath, JSON.stringify([
       {
         id: 'user1',
-        name: 'User 1',
-        email: 'user1@example.com',
+        name: 'Mani',
+        email: 'mani@example.com',
         phone: '+91XXXXXXXXXX',
         whatsappNumber: '+91XXXXXXXXXX'
       },
       {
         id: 'user2',
-        name: 'User 2',
-        email: 'user2@example.com',
+        name: 'Shankar',
+        email: 'shankar@example.com',
         phone: '+91XXXXXXXXXX',
         whatsappNumber: '+91XXXXXXXXXX'
       }
@@ -352,24 +359,40 @@ app.put('/api/users/:id', (req, res) => {
 
 const sendReminder = async (rental, user) => {
   try {
+    const flatStr = rental.flatName ? `${rental.flatName} - Flat ${rental.flatNumber}` : `Flat ${rental.flatNumber}`;
+    const endDateStr = new Date(rental.endDate).toLocaleDateString();
+    const rentStr = rental.rentAmount.toLocaleString();
+    
     console.log('\n' + '='.repeat(60));
     console.log('🔔 REMINDER NOTIFICATION');
     console.log('='.repeat(60));
-    console.log(`📍 Flat Number: ${rental.flatNumber}`);
+    console.log(`📍 Flat: ${flatStr}`);
     console.log(`👤 User: ${user.name}`);
-    console.log(`💰 Rent Amount: ₹${rental.rentAmount.toLocaleString()}`);
-    console.log(`📅 Agreement Ends On: ${new Date(rental.endDate).toLocaleDateString()}`);
+    console.log(`💰 Rent Amount: ₹${rentStr}`);
+    console.log(`📅 Agreement Ends On: ${endDateStr}`);
     console.log(`⏱️  Time Left: 2 days`);
     console.log('');
-    console.log('📱 Notification Channels:');
-    console.log(`  ✓ WhatsApp: ${user.whatsappNumber}`);
-    console.log(`  ✓ Email: ${user.email}`);
-    console.log(`  ✓ Calendar: Google Calendar`);
-    console.log('');
-    console.log('💡 Integration Ready: Configure Twilio, Gmail, and Google Calendar API');
+    
+    // Attempt WhatsApp integration via Twilio
+    if (twilioClient && user.whatsappNumber && !user.whatsappNumber.includes('XXXXXXXXXX')) {
+      const message = `🔔 *Rental Agreement Reminder*\n\nHi ${user.name},\nYour rental agreement for *${flatStr}* is ending in 2 days on *${endDateStr}*.\n\nCurrent Rent Amount: ₹${rentStr}\n\nPlease review and renew your agreement if necessary.`;
+      
+      await twilioClient.messages.create({
+        body: message,
+        from: twilioPhoneNumber,
+        to: `whatsapp:${user.whatsappNumber}` // must be in E.164 format, e.g., +919876543210
+      });
+      console.log(`✅ WhatsApp reminder sent successfully to ${user.name} at ${user.whatsappNumber} via Twilio!`);
+    } else {
+      console.log('📱 Notification Channels check:');
+      console.log(`  ! WhatsApp: ${user.whatsappNumber} (Dummy number or Twilio not configured)`);
+      console.log('💡 To send real WhatsApp messages:');
+      console.log('   1. Add TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER to backend/.env');
+      console.log('   2. Update the user\'s whatsappNumber to a valid real number in Settings.');
+    }
     console.log('='.repeat(60) + '\n');
   } catch (error) {
-    console.error('Error sending reminder:', error);
+    console.error('Error sending reminder via Twilio:', error);
   }
 };
 
