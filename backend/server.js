@@ -53,6 +53,31 @@ const initializeDb = () => {
 
 initializeDb();
 
+// Data Migration for rentals (userId -> userIds, add flatName)
+try {
+  if (fs.existsSync(rentalDbPath)) {
+    const rentals = JSON.parse(fs.readFileSync(rentalDbPath, 'utf8'));
+    let modified = false;
+    const migrated = rentals.map(r => {
+      if (r.userId && !r.userIds) {
+        r.userIds = [r.userId];
+        delete r.userId;
+        modified = true;
+      }
+      if (r.flatName === undefined) {
+        r.flatName = '';
+        modified = true;
+      }
+      return r;
+    });
+    if (modified) {
+      fs.writeFileSync(rentalDbPath, JSON.stringify(migrated, null, 2));
+    }
+  }
+} catch (err) {
+  console.error('Migration error:', err);
+}
+
 // Helper functions to read/write JSON
 const readRentals = () => JSON.parse(fs.readFileSync(rentalDbPath, 'utf8'));
 const writeRentals = (data) => fs.writeFileSync(rentalDbPath, JSON.stringify(data, null, 2));
@@ -91,9 +116,9 @@ app.get('/api/rentals/:id', (req, res) => {
 // Create new rental
 app.post('/api/rentals', (req, res) => {
   try {
-    const { flatNumber, startDate, endDate, rentAmount, userId } = req.body;
+    const { flatNumber, flatName, startDate, endDate, rentAmount, userIds } = req.body;
     
-    if (!flatNumber || !startDate || !endDate || !rentAmount || !userId) {
+    if (!flatNumber || !startDate || !endDate || !rentAmount || !userIds || !userIds.length) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
@@ -101,10 +126,11 @@ app.post('/api/rentals', (req, res) => {
     const newRental = {
       id: Date.now().toString(),
       flatNumber,
+      flatName: flatName || '',
       startDate: new Date(startDate),
       endDate: new Date(endDate),
       rentAmount,
-      userId,
+      userIds,
       rentHistory: [
         {
           amount: rentAmount,
@@ -128,7 +154,7 @@ app.post('/api/rentals', (req, res) => {
 // Update rental
 app.put('/api/rentals/:id', (req, res) => {
   try {
-    const { flatNumber, startDate, endDate, rentAmount, status } = req.body;
+    const { flatNumber, flatName, startDate, endDate, rentAmount, status, userIds, isNewAgreement } = req.body;
     const rentals = readRentals();
     const rentalIndex = rentals.findIndex(r => r.id === req.params.id);
 
@@ -136,20 +162,48 @@ app.put('/api/rentals/:id', (req, res) => {
 
     const rental = rentals[rentalIndex];
 
-    if (flatNumber) rental.flatNumber = flatNumber;
-    if (startDate) rental.startDate = new Date(startDate);
-    if (endDate) rental.endDate = new Date(endDate);
-    if (status) rental.status = status;
-
-    if (rentAmount && rentAmount !== rental.rentAmount) {
+    // If this is a new agreement, log the old agreement details in history
+    if (isNewAgreement) {
       rental.rentHistory.push({
-        amount: rentAmount,
+        type: 'agreement',
+        amount: rental.rentAmount,
+        startDate: rental.startDate,
+        endDate: rental.endDate,
         date: new Date(),
-        previousAmount: rental.rentAmount,
-        note: `Updated from ${rental.rentAmount} to ${rentAmount}`
+        note: `Agreement ended: ₹${rental.rentAmount} (${new Date(rental.startDate).toLocaleDateString()} → ${new Date(rental.endDate).toLocaleDateString()})`
       });
-      rental.rentAmount = rentAmount;
+      rental.rentHistory.push({
+        type: 'agreement',
+        amount: parseFloat(rentAmount) || rental.rentAmount,
+        startDate: startDate ? new Date(startDate) : rental.startDate,
+        endDate: endDate ? new Date(endDate) : rental.endDate,
+        date: new Date(),
+        note: `New agreement started: ₹${rentAmount || rental.rentAmount} (${startDate ? new Date(startDate).toLocaleDateString() : 'same start'} → ${endDate ? new Date(endDate).toLocaleDateString() : 'same end'})`
+      });
+      if (rentAmount) rental.rentAmount = parseFloat(rentAmount);
+      if (startDate) rental.startDate = new Date(startDate);
+      if (endDate) rental.endDate = new Date(endDate);
+      rental.status = 'active';
+    } else {
+      // Normal edit — track rent changes
+      if (rentAmount && parseFloat(rentAmount) !== rental.rentAmount) {
+        rental.rentHistory.push({
+          type: 'rent_change',
+          amount: parseFloat(rentAmount),
+          date: new Date(),
+          previousAmount: rental.rentAmount,
+          note: `Rent updated from ₹${rental.rentAmount} to ₹${rentAmount}`
+        });
+        rental.rentAmount = parseFloat(rentAmount);
+      }
+      if (startDate) rental.startDate = new Date(startDate);
+      if (endDate) rental.endDate = new Date(endDate);
+      if (status) rental.status = status;
     }
+
+    if (flatNumber) rental.flatNumber = flatNumber;
+    if (flatName !== undefined) rental.flatName = flatName;
+    if (userIds && userIds.length > 0) rental.userIds = userIds;
 
     rental.updatedAt = new Date();
     rentals[rentalIndex] = rental;
@@ -201,7 +255,7 @@ app.post('/api/expenses', (req, res) => {
   try {
     const { flatNumber, category, amount, description, userId, date } = req.body;
 
-    if (!flatNumber || !category || !amount || !userId) {
+    if (!category || !amount || !userId) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
@@ -331,11 +385,13 @@ cron.schedule('0 * * * *', async () => {
       const today = new Date();
       const daysUntilEnd = Math.floor((endDate - today) / (1000 * 60 * 60 * 24));
 
-      if (daysUntilEnd === 2) {
-        const user = users.find(u => u.id === rental.userId);
-        if (user) {
-          sendReminder(rental, user);
-        }
+      if (daysUntilEnd === 2 && rental.userIds) {
+        rental.userIds.forEach(uid => {
+          const user = users.find(u => u.id === uid);
+          if (user) {
+            sendReminder(rental, user);
+          }
+        });
       }
     });
   } catch (error) {

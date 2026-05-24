@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-const ExpenseTracker = ({ currentUser }) => {
+const ExpenseTracker = ({ currentUser, users }) => {
   const [expenses, setExpenses] = useState([]);
   const [rentals, setRentals] = useState([]);
   const [formData, setFormData] = useState({
@@ -23,7 +23,7 @@ const ExpenseTracker = ({ currentUser }) => {
     try {
       const response = await fetch('http://localhost:5000/api/rentals');
       const data = await response.json();
-      const userRentals = data.filter(r => r.userId === currentUser);
+      const userRentals = data.filter(r => r.userIds && r.userIds.includes(currentUser));
       setRentals(userRentals);
     } catch (error) {
       console.error('Error fetching rentals:', error);
@@ -34,7 +34,15 @@ const ExpenseTracker = ({ currentUser }) => {
     try {
       const response = await fetch('http://localhost:5000/api/expenses');
       const data = await response.json();
-      const userExpenses = data.filter(e => e.userId === currentUser);
+      // Show expenses created by the user OR for flats they collaborate on
+      const rentalsRes = await fetch('http://localhost:5000/api/rentals');
+      const rentalsData = await rentalsRes.json();
+      const userFlatNumbers = rentalsData
+        .filter(r => r.userIds && r.userIds.includes(currentUser))
+        .map(r => r.flatNumber);
+      const userExpenses = data.filter(e => 
+        e.userId === currentUser || (e.flatNumber && userFlatNumbers.includes(e.flatNumber))
+      );
       setExpenses(userExpenses);
     } catch (error) {
       console.error('Error fetching expenses:', error);
@@ -125,17 +133,16 @@ const ExpenseTracker = ({ currentUser }) => {
         <form onSubmit={handleSubmit} className="expense-form">
           <div className="form-row">
             <div className="form-group">
-              <label>Flat Number *</label>
+              <label>Flat Number</label>
               <select
                 name="flatNumber"
                 value={formData.flatNumber}
                 onChange={handleChange}
-                required
               >
-                <option value="">Select a flat</option>
+                <option value="">None (General Expense)</option>
                 {rentals.map(rental => (
                   <option key={rental.id} value={rental.flatNumber}>
-                    Flat {rental.flatNumber}
+                    {rental.flatName ? `${rental.flatName} - ` : ''}Flat {rental.flatNumber}
                   </option>
                 ))}
               </select>
@@ -214,7 +221,7 @@ const ExpenseTracker = ({ currentUser }) => {
             <option value="">All Flats</option>
             {rentals.map(rental => (
               <option key={rental.id} value={rental.flatNumber}>
-                Flat {rental.flatNumber}
+                {rental.flatName ? `${rental.flatName} - ` : ''}Flat {rental.flatNumber}
               </option>
             ))}
           </select>

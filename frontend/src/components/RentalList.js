@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import RentalDetails from './RentalDetails';
 
-const RentalList = ({ currentUser }) => {
+const RentalList = ({ currentUser, users }) => {
   const [rentals, setRentals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedRental, setSelectedRental] = useState(null);
@@ -14,7 +14,7 @@ const RentalList = ({ currentUser }) => {
     try {
       const response = await fetch('http://localhost:5000/api/rentals');
       const data = await response.json();
-      const userRentals = data.filter(r => r.userId === currentUser);
+      const userRentals = data.filter(r => r.userIds && r.userIds.includes(currentUser));
       setRentals(userRentals);
     } catch (error) {
       console.error('Error fetching rentals:', error);
@@ -55,7 +55,7 @@ const RentalList = ({ currentUser }) => {
               onClick={() => setSelectedRental(rental)}
             >
               <div className="card-header">
-                <h3>Flat {rental.flatNumber}</h3>
+                <h3>{rental.flatName ? `${rental.flatName} - ` : ''}Flat {rental.flatNumber}</h3>
                 <span className="status-badge" style={{ backgroundColor: status.color }}>
                   {status.label}
                 </span>
@@ -89,6 +89,7 @@ const RentalList = ({ currentUser }) => {
       {selectedRental && (
         <RentalDetails 
           rental={selectedRental} 
+          users={users}
           onClose={() => setSelectedRental(null)}
           onUpdate={fetchRentals}
         />

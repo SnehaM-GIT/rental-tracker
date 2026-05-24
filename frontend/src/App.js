@@ -74,14 +74,14 @@ function App() {
       </nav>
 
       <main className="app-main">
-        {activeTab === 'dashboard' && <Dashboard currentUser={currentUser} />}
+        {activeTab === 'dashboard' && <Dashboard currentUser={currentUser} users={users} />}
         {activeTab === 'rentals' && (
           <div className="rentals-section">
-            <RentalForm currentUser={currentUser} onSuccess={() => {}} />
-            <RentalList currentUser={currentUser} />
+            <RentalForm currentUser={currentUser} users={users} onSuccess={() => {}} />
+            <RentalList currentUser={currentUser} users={users} />
           </div>
         )}
-        {activeTab === 'expenses' && <ExpenseTracker currentUser={currentUser} />}
+        {activeTab === 'expenses' && <ExpenseTracker currentUser={currentUser} users={users} />}
         {activeTab === 'settings' && <UserSettings userId={currentUser} onUpdate={fetchUsers} />}
       </main>
     </div>

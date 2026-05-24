@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import RentalList from './RentalList';
 
-const Dashboard = ({ currentUser }) => {
+const Dashboard = ({ currentUser, users }) => {
   const [stats, setStats] = useState({
     totalRentals: 0,
     totalMonthlyRent: 0,
@@ -18,11 +19,14 @@ const Dashboard = ({ currentUser }) => {
     try {
       const rentalsRes = await fetch('http://localhost:5000/api/rentals');
       const rentalsData = await rentalsRes.json();
-      const userRentals = rentalsData.filter(r => r.userId === currentUser);
+      const userRentals = rentalsData.filter(r => r.userIds && r.userIds.includes(currentUser));
 
       const expensesRes = await fetch('http://localhost:5000/api/expenses');
       const expensesData = await expensesRes.json();
-      const userExpenses = expensesData.filter(e => e.userId === currentUser);
+      const userFlatNumbers = userRentals.map(r => r.flatNumber);
+      const userExpenses = expensesData.filter(e => 
+        e.userId === currentUser || (e.flatNumber && userFlatNumbers.includes(e.flatNumber))
+      );
 
       const currentMonth = new Date().toISOString().substring(0, 7);
       const currentMonthExpenses = userExpenses.filter(e => 
@@ -40,6 +44,7 @@ const Dashboard = ({ currentUser }) => {
         if (daysUntilEnd <= 2 && daysUntilEnd >= 0) {
           endingSoonCount++;
           reminders.push({
+            flatName: rental.flatName,
             flatNumber: rental.flatNumber,
             daysLeft: daysUntilEnd,
             endDate: endDate
@@ -72,13 +77,6 @@ const Dashboard = ({ currentUser }) => {
           </div>
         </div>
 
-        <div className="stat-card">
-          <div className="stat-icon">💰</div>
-          <div className="stat-content">
-            <div className="stat-label">Monthly Rent</div>
-            <div className="stat-value">₹{stats.totalMonthlyRent.toLocaleString()}</div>
-          </div>
-        </div>
 
         <div className="stat-card">
           <div className="stat-icon">✅</div>
@@ -113,7 +111,7 @@ const Dashboard = ({ currentUser }) => {
               <div key={index} className="reminder-card">
                 <div className="reminder-icon">📍</div>
                 <div className="reminder-content">
-                  <div className="reminder-flat">Flat {reminder.flatNumber}</div>
+                  <div className="reminder-flat">{reminder.flatName ? `${reminder.flatName} - ` : ''}Flat {reminder.flatNumber}</div>
                   <div className="reminder-days">
                     {reminder.daysLeft === 0 
                       ? '🚨 Agreement ends TODAY!' 
@@ -128,6 +126,10 @@ const Dashboard = ({ currentUser }) => {
           </div>
         </div>
       )}
+
+      <div className="dashboard-rentals">
+        <RentalList currentUser={currentUser} users={users} />
+      </div>
     </div>
   );
 };

@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 
-const RentalForm = ({ currentUser, onSuccess }) => {
+const RentalForm = ({ currentUser, users, onSuccess }) => {
   const [formData, setFormData] = useState({
+    flatName: '',
     flatNumber: '',
     startDate: '',
     endDate: '',
     rentAmount: ''
   });
+  const [selectedUsers, setSelectedUsers] = useState([currentUser]);
 
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
@@ -17,6 +19,16 @@ const RentalForm = ({ currentUser, onSuccess }) => {
       ...prev,
       [name]: value
     }));
+  };
+
+  const handleUserToggle = (userId) => {
+    setSelectedUsers(prev => {
+      if (prev.includes(userId)) {
+        return prev.filter(id => id !== userId);
+      } else {
+        return [...prev, userId];
+      }
+    });
   };
 
   const handleSubmit = async (e) => {
@@ -31,13 +43,14 @@ const RentalForm = ({ currentUser, onSuccess }) => {
         body: JSON.stringify({
           ...formData,
           rentAmount: parseFloat(formData.rentAmount),
-          userId: currentUser
+          userIds: selectedUsers.length > 0 ? selectedUsers : [currentUser]
         })
       });
 
       if (response.ok) {
         setMessage('✅ Rental agreement added successfully!');
-        setFormData({ flatNumber: '', startDate: '', endDate: '', rentAmount: '' });
+        setFormData({ flatName: '', flatNumber: '', startDate: '', endDate: '', rentAmount: '' });
+        setSelectedUsers([currentUser]);
         onSuccess();
         setTimeout(() => window.location.reload(), 1500);
       } else {
@@ -56,6 +69,17 @@ const RentalForm = ({ currentUser, onSuccess }) => {
       {message && <div className={`message ${message.includes('✅') ? 'success' : 'error'}`}>{message}</div>}
       
       <form onSubmit={handleSubmit} className="rental-form">
+        <div className="form-group">
+          <label>Flat Name</label>
+          <input
+            type="text"
+            name="flatName"
+            value={formData.flatName}
+            onChange={handleChange}
+            placeholder="e.g., Sunrise Apartments"
+          />
+        </div>
+
         <div className="form-group">
           <label>Flat Number *</label>
           <input
@@ -104,6 +128,22 @@ const RentalForm = ({ currentUser, onSuccess }) => {
             step="100"
             required
           />
+        </div>
+
+        <div className="form-group">
+          <label>Collaborators *</label>
+          <div className="checkbox-group" style={{ display: 'flex', gap: '15px' }}>
+            {users && users.map(user => (
+              <label key={user.id} style={{ display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 'normal' }}>
+                <input
+                  type="checkbox"
+                  checked={selectedUsers.includes(user.id)}
+                  onChange={() => handleUserToggle(user.id)}
+                />
+                {user.name}
+              </label>
+            ))}
+          </div>
         </div>
 
         <button type="submit" disabled={loading} className="btn-primary">

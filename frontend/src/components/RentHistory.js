@@ -21,19 +21,37 @@ const RentHistory = ({ rentalId }) => {
   };
 
   if (loading) return <div className="loading">Loading history...</div>;
+  if (history.length <= 1) return null; // Don't show if only the initial entry
+
+  const getEntryIcon = (entry) => {
+    if (entry.type === 'agreement' && entry.note?.startsWith('Agreement ended')) return '🔴';
+    if (entry.type === 'agreement' && entry.note?.startsWith('New agreement')) return '🟢';
+    if (entry.type === 'rent_change') return '💰';
+    return '📝';
+  };
 
   return (
     <div className="rent-history-section">
-      <h3>📈 Rent History</h3>
+      <h3>📈 Agreement & Rent History</h3>
       <div className="history-timeline">
-        {history.map((entry, index) => (
-          <div key={index} className="history-entry">
-            <div className="history-date">
-              {new Date(entry.date).toLocaleDateString()}
+        {[...history].reverse().map((entry, index) => (
+          <div key={index} className="history-entry" style={{
+            borderLeft: entry.type === 'agreement' ? '3px solid #3498db' : '3px solid #95a5a6',
+            paddingLeft: '12px',
+            marginBottom: '12px'
+          }}>
+            <div className="history-date" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span>{getEntryIcon(entry)}</span>
+              <span>{new Date(entry.date).toLocaleDateString()}</span>
             </div>
             <div className="history-amount">
-              ₹{entry.amount.toLocaleString()}
+              ₹{entry.amount?.toLocaleString()}
             </div>
+            {entry.startDate && entry.endDate && (
+              <div style={{ fontSize: '0.85em', color: '#7f8c8d' }}>
+                {new Date(entry.startDate).toLocaleDateString()} → {new Date(entry.endDate).toLocaleDateString()}
+              </div>
+            )}
             {entry.previousAmount && (
               <div className="history-change">
                 (from ₹{entry.previousAmount.toLocaleString()})
