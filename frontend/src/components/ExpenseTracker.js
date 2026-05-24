@@ -1,0 +1,261 @@
+import React, { useState, useEffect } from 'react';
+
+const ExpenseTracker = ({ currentUser }) => {
+  const [expenses, setExpenses] = useState([]);
+  const [rentals, setRentals] = useState([]);
+  const [formData, setFormData] = useState({
+    flatNumber: '',
+    category: 'maintenance',
+    amount: '',
+    description: '',
+    date: new Date().toISOString().split('T')[0]
+  });
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState('');
+  const [filterFlat, setFilterFlat] = useState('');
+
+  useEffect(() => {
+    fetchRentals();
+    fetchExpenses();
+  }, [currentUser]);
+
+  const fetchRentals = async () => {
+    try {
+      const response = await fetch('http://localhost:5000/api/rentals');
+      const data = await response.json();
+      const userRentals = data.filter(r => r.userId === currentUser);
+      setRentals(userRentals);
+    } catch (error) {
+      console.error('Error fetching rentals:', error);
+    }
+  };
+
+  const fetchExpenses = async () => {
+    try {
+      const response = await fetch('http://localhost:5000/api/expenses');
+      const data = await response.json();
+      const userExpenses = data.filter(e => e.userId === currentUser);
+      setExpenses(userExpenses);
+    } catch (error) {
+      console.error('Error fetching expenses:', error);
+    }
+  };
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setMessage('');
+
+    try {
+      const response = await fetch('http://localhost:5000/api/expenses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...formData,
+          amount: parseFloat(formData.amount),
+          userId: currentUser
+        })
+      });
+
+      if (response.ok) {
+        setMessage('✅ Expense added successfully!');
+        setFormData({
+          flatNumber: '',
+          category: 'maintenance',
+          amount: '',
+          description: '',
+          date: new Date().toISOString().split('T')[0]
+        });
+        fetchExpenses();
+        setTimeout(() => setMessage(''), 3000);
+      } else {
+        setMessage('❌ Error adding expense');
+      }
+    } catch (error) {
+      setMessage(`❌ Error: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async (expenseId) => {
+    if (window.confirm('Are you sure you want to delete this expense?')) {
+      try {
+        const response = await fetch(`http://localhost:5000/api/expenses/${expenseId}`, {
+          method: 'DELETE'
+        });
+
+        if (response.ok) {
+          fetchExpenses();
+        }
+      } catch (error) {
+        console.error('Error deleting expense:', error);
+      }
+    }
+  };
+
+  const categoryIcons = {
+    maid: '🧹',
+    repairs: '🔧',
+    utilities: '💡',
+    maintenance: '🏠',
+    other: '📝'
+  };
+
+  const filteredExpenses = filterFlat 
+    ? expenses.filter(e => e.flatNumber === filterFlat)
+    : expenses;
+
+  const totalExpenses = filteredExpenses.reduce((sum, e) => sum + e.amount, 0);
+
+  return (
+    <div className="expense-tracker-container">
+      <div className="expense-form-section">
+        <h2>Add Monthly Expense</h2>
+        {message && <div className={`message ${message.includes('✅') ? 'success' : 'error'}`}>{message}</div>}
+        
+        <form onSubmit={handleSubmit} className="expense-form">
+          <div className="form-row">
+            <div className="form-group">
+              <label>Flat Number *</label>
+              <select
+                name="flatNumber"
+                value={formData.flatNumber}
+                onChange={handleChange}
+                required
+              >
+                <option value="">Select a flat</option>
+                {rentals.map(rental => (
+                  <option key={rental.id} value={rental.flatNumber}>
+                    Flat {rental.flatNumber}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label>Category *</label>
+              <select
+                name="category"
+                value={formData.category}
+                onChange={handleChange}
+                required
+              >
+                <option value="maid">🧹 Maid</option>
+                <option value="repairs">🔧 Repairs</option>
+                <option value="utilities">💡 Utilities</option>
+                <option value="maintenance">🏠 Maintenance</option>
+                <option value="other">📝 Other</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="form-row">
+            <div className="form-group">
+              <label>Amount (₹) *</label>
+              <input
+                type="number"
+                name="amount"
+                value={formData.amount}
+                onChange={handleChange}
+                placeholder="500"
+                min="0"
+                step="50"
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Date *</label>
+              <input
+                type="date"
+                name="date"
+                value={formData.date}
+                onChange={handleChange}
+                required
+              />
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label>Description</label>
+            <input
+              type="text"
+              name="description"
+              value={formData.description}
+              onChange={handleChange}
+              placeholder="e.g., Monthly cleaning, AC repair"
+            />
+          </div>
+
+          <button type="submit" disabled={loading} className="btn-primary">
+            {loading ? '⏳ Adding...' : '➕ Add Expense'}
+          </button>
+        </form>
+      </div>
+
+      <div className="expense-list-section">
+        <h2>Expense History</h2>
+        
+        <div className="filter-section">
+          <select
+            value={filterFlat}
+            onChange={(e) => setFilterFlat(e.target.value)}
+            className="filter-dropdown"
+          >
+            <option value="">All Flats</option>
+            {rentals.map(rental => (
+              <option key={rental.id} value={rental.flatNumber}>
+                Flat {rental.flatNumber}
+              </option>
+            ))}
+          </select>
+          <div className="total-expenses">
+            Total: <strong>₹{totalExpenses.toLocaleString()}</strong>
+          </div>
+        </div>
+
+        <div className="expense-list">
+          {filteredExpenses.length === 0 ? (
+            <div className="empty-state">No expenses recorded yet.</div>
+          ) : (
+            filteredExpenses.map(expense => (
+              <div key={expense.id} className="expense-item">
+                <div className="expense-icon">
+                  {categoryIcons[expense.category] || '📝'}
+                </div>
+                <div className="expense-details">
+                  <div className="expense-category">{expense.category}</div>
+                  <div className="expense-description">{expense.description}</div>
+                  <div className="expense-date">
+                    {new Date(expense.date).toLocaleDateString()}
+                  </div>
+                </div>
+                <div className="expense-amount">
+                  ₹{expense.amount.toLocaleString()}
+                </div>
+                <button
+                  className="btn-delete"
+                  onClick={() => handleDelete(expense.id)}
+                  title="Delete expense"
+                >
+                  🗑️
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default ExpenseTracker;
