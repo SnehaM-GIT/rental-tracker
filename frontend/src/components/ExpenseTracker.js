@@ -21,7 +21,7 @@ const ExpenseTracker = ({ currentUser, users }) => {
 
   const fetchRentals = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/rentals');
+      const response = await fetch('/api/rentals');
       const data = await response.json();
       const userRentals = data.filter(r => r.userIds && r.userIds.includes(currentUser));
       setRentals(userRentals);
@@ -32,15 +32,18 @@ const ExpenseTracker = ({ currentUser, users }) => {
 
   const fetchExpenses = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/expenses');
-      const data = await response.json();
-      // Show expenses created by the user OR for flats they collaborate on
-      const rentalsRes = await fetch('http://localhost:5000/api/rentals');
-      const rentalsData = await rentalsRes.json();
+      const [expRes, rentRes] = await Promise.all([
+        fetch('/api/expenses'),
+        fetch('/api/rentals')
+      ]);
+      const expensesData = await expRes.json();
+      const rentalsData = await rentRes.json();
+
       const userFlatNumbers = rentalsData
         .filter(r => r.userIds && r.userIds.includes(currentUser))
         .map(r => r.flatNumber);
-      const userExpenses = data.filter(e => 
+
+      const userExpenses = expensesData.filter(e =>
         e.userId === currentUser || (e.flatNumber && userFlatNumbers.includes(e.flatNumber))
       );
       setExpenses(userExpenses);
@@ -51,10 +54,7 @@ const ExpenseTracker = ({ currentUser, users }) => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e) => {
@@ -63,7 +63,7 @@ const ExpenseTracker = ({ currentUser, users }) => {
     setMessage('');
 
     try {
-      const response = await fetch('http://localhost:5000/api/expenses', {
+      const response = await fetch('/api/expenses', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -83,9 +83,9 @@ const ExpenseTracker = ({ currentUser, users }) => {
           date: new Date().toISOString().split('T')[0]
         });
         fetchExpenses();
-        setTimeout(() => setMessage(''), 3000);
+        setTimeout(() => setMessage(''), 4000);
       } else {
-        setMessage('❌ Error adding expense');
+        setMessage('❌ Error adding expense. Please try again.');
       }
     } catch (error) {
       setMessage(`❌ Error: ${error.message}`);
@@ -97,10 +97,9 @@ const ExpenseTracker = ({ currentUser, users }) => {
   const handleDelete = async (expenseId) => {
     if (window.confirm('Are you sure you want to delete this expense?')) {
       try {
-        const response = await fetch(`http://localhost:5000/api/expenses/${expenseId}`, {
+        const response = await fetch(`/api/expenses/${expenseId}`, {
           method: 'DELETE'
         });
-
         if (response.ok) {
           fetchExpenses();
         }
@@ -111,14 +110,14 @@ const ExpenseTracker = ({ currentUser, users }) => {
   };
 
   const categoryIcons = {
-    maid: '🧹',
-    repairs: '🔧',
-    utilities: '💡',
+    maid:        '🧹',
+    repairs:     '🔧',
+    utilities:   '💡',
     maintenance: '🏠',
-    other: '📝'
+    other:       '📝'
   };
 
-  const filteredExpenses = filterFlat 
+  const filteredExpenses = filterFlat
     ? expenses.filter(e => e.flatNumber === filterFlat)
     : expenses;
 
@@ -126,15 +125,22 @@ const ExpenseTracker = ({ currentUser, users }) => {
 
   return (
     <div className="expense-tracker-container">
+
+      {/* Add Expense Form */}
       <div className="expense-form-section">
-        <h2>Add Monthly Expense</h2>
-        {message && <div className={`message ${message.includes('✅') ? 'success' : 'error'}`}>{message}</div>}
-        
+        <h2>Add Expense</h2>
+        {message && (
+          <div className={`message ${message.includes('✅') ? 'success' : 'error'}`}>
+            {message}
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="expense-form">
           <div className="form-row">
             <div className="form-group">
-              <label>Flat Number</label>
+              <label htmlFor="exp-flat">Property</label>
               <select
+                id="exp-flat"
                 name="flatNumber"
                 value={formData.flatNumber}
                 onChange={handleChange}
@@ -142,21 +148,22 @@ const ExpenseTracker = ({ currentUser, users }) => {
                 <option value="">None (General Expense)</option>
                 {rentals.map(rental => (
                   <option key={rental.id} value={rental.flatNumber}>
-                    {rental.flatName ? `${rental.flatName} - ` : ''}Flat {rental.flatNumber}
+                    {rental.flatName ? `${rental.flatName} — ` : ''}Flat {rental.flatNumber}
                   </option>
                 ))}
               </select>
             </div>
 
             <div className="form-group">
-              <label>Category *</label>
+              <label htmlFor="exp-category">Category *</label>
               <select
+                id="exp-category"
                 name="category"
                 value={formData.category}
                 onChange={handleChange}
                 required
               >
-                <option value="maid">🧹 Maid</option>
+                <option value="maid">🧹 Maid / Cleaning</option>
                 <option value="repairs">🔧 Repairs</option>
                 <option value="utilities">💡 Utilities</option>
                 <option value="maintenance">🏠 Maintenance</option>
@@ -167,13 +174,14 @@ const ExpenseTracker = ({ currentUser, users }) => {
 
           <div className="form-row">
             <div className="form-group">
-              <label>Amount (₹) *</label>
+              <label htmlFor="exp-amount">Amount (₹) *</label>
               <input
+                id="exp-amount"
                 type="number"
                 name="amount"
                 value={formData.amount}
                 onChange={handleChange}
-                placeholder="500"
+                placeholder="e.g. 500"
                 min="0"
                 step="50"
                 required
@@ -181,8 +189,9 @@ const ExpenseTracker = ({ currentUser, users }) => {
             </div>
 
             <div className="form-group">
-              <label>Date *</label>
+              <label htmlFor="exp-date">Date *</label>
               <input
+                id="exp-date"
                 type="date"
                 name="date"
                 value={formData.date}
@@ -193,13 +202,14 @@ const ExpenseTracker = ({ currentUser, users }) => {
           </div>
 
           <div className="form-group">
-            <label>Description</label>
+            <label htmlFor="exp-description">Description</label>
             <input
+              id="exp-description"
               type="text"
               name="description"
               value={formData.description}
               onChange={handleChange}
-              placeholder="e.g., Monthly cleaning, AC repair"
+              placeholder="e.g. Monthly cleaning, AC repair"
             />
           </div>
 
@@ -209,30 +219,35 @@ const ExpenseTracker = ({ currentUser, users }) => {
         </form>
       </div>
 
+      {/* Expense List */}
       <div className="expense-list-section">
         <h2>Expense History</h2>
-        
+
         <div className="filter-section">
           <select
+            id="filter-flat"
             value={filterFlat}
             onChange={(e) => setFilterFlat(e.target.value)}
             className="filter-dropdown"
           >
-            <option value="">All Flats</option>
+            <option value="">All Properties</option>
             {rentals.map(rental => (
               <option key={rental.id} value={rental.flatNumber}>
-                {rental.flatName ? `${rental.flatName} - ` : ''}Flat {rental.flatNumber}
+                {rental.flatName ? `${rental.flatName} — ` : ''}Flat {rental.flatNumber}
               </option>
             ))}
           </select>
           <div className="total-expenses">
-            Total: <strong>₹{totalExpenses.toLocaleString()}</strong>
+            Total: <strong>₹{totalExpenses.toLocaleString('en-IN')}</strong>
           </div>
         </div>
 
         <div className="expense-list">
           {filteredExpenses.length === 0 ? (
-            <div className="empty-state">No expenses recorded yet.</div>
+            <div className="empty-state">
+              📭 No expenses recorded yet.<br />
+              <span style={{ fontSize: '0.9em' }}>Add your first expense above.</span>
+            </div>
           ) : (
             filteredExpenses.map(expense => (
               <div key={expense.id} className="expense-item">
@@ -241,18 +256,24 @@ const ExpenseTracker = ({ currentUser, users }) => {
                 </div>
                 <div className="expense-details">
                   <div className="expense-category">{expense.category}</div>
-                  <div className="expense-description">{expense.description}</div>
+                  {expense.description && (
+                    <div className="expense-description">{expense.description}</div>
+                  )}
                   <div className="expense-date">
-                    {new Date(expense.date).toLocaleDateString()}
+                    {new Date(expense.date).toLocaleDateString('en-IN', {
+                      day: 'numeric', month: 'short', year: 'numeric'
+                    })}
+                    {expense.flatNumber && ` · Flat ${expense.flatNumber}`}
                   </div>
                 </div>
                 <div className="expense-amount">
-                  ₹{expense.amount.toLocaleString()}
+                  ₹{expense.amount.toLocaleString('en-IN')}
                 </div>
                 <button
                   className="btn-delete"
                   onClick={() => handleDelete(expense.id)}
-                  title="Delete expense"
+                  title="Delete this expense"
+                  aria-label={`Delete expense of ₹${expense.amount}`}
                 >
                   🗑️
                 </button>

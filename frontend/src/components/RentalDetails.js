@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import RentHistory from './RentHistory';
 
 const RentalDetails = ({ rental, users, onClose, onUpdate }) => {
@@ -7,53 +7,47 @@ const RentalDetails = ({ rental, users, onClose, onUpdate }) => {
   const [formData, setFormData] = useState({
     flatName: rental.flatName || '',
     flatNumber: rental.flatNumber,
-    startDate: rental.startDate.split('T')[0],
-    endDate: rental.endDate.split('T')[0],
+    startDate: rental.startDate ? rental.startDate.split('T')[0] : '',
+    endDate: rental.endDate ? rental.endDate.split('T')[0] : '',
     rentAmount: rental.rentAmount
   });
   const [selectedUsers, setSelectedUsers] = useState(rental.userIds || []);
   const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState('');
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const handleUserToggle = (userId) => {
-    setSelectedUsers(prev => {
-      if (prev.includes(userId)) return prev.filter(id => id !== userId);
-      return [...prev, userId];
-    });
+    setSelectedUsers(prev =>
+      prev.includes(userId)
+        ? prev.filter(id => id !== userId)
+        : [...prev, userId]
+    );
   };
 
   const startNewAgreement = () => {
     setIsNewAgreement(true);
     setIsEditing(true);
-    // Pre-fill with empty dates so user enters the new agreement period
-    setFormData(prev => ({
-      ...prev,
-      startDate: '',
-      endDate: '',
-      rentAmount: prev.rentAmount
-    }));
+    setFormData(prev => ({ ...prev, startDate: '', endDate: '' }));
   };
 
   const handleUpdate = async (e) => {
     e.preventDefault();
     setLoading(true);
+    setMessage('');
 
     try {
-      const response = await fetch(`http://localhost:5000/api/rentals/${rental.id}`, {
+      const response = await fetch(`/api/rentals/${rental.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...formData,
           rentAmount: parseFloat(formData.rentAmount),
           userIds: selectedUsers,
-          isNewAgreement: isNewAgreement
+          isNewAgreement
         })
       });
 
@@ -62,85 +56,136 @@ const RentalDetails = ({ rental, users, onClose, onUpdate }) => {
         setIsNewAgreement(false);
         onUpdate();
         onClose();
+      } else {
+        setMessage('❌ Could not save changes. Please try again.');
       }
     } catch (error) {
-      console.error('Error updating rental:', error);
+      setMessage(`❌ Error: ${error.message}`);
     } finally {
       setLoading(false);
     }
   };
 
+  const cancelEdit = () => {
+    setIsEditing(false);
+    setIsNewAgreement(false);
+    // Reset form back to original values
+    setFormData({
+      flatName: rental.flatName || '',
+      flatNumber: rental.flatNumber,
+      startDate: rental.startDate ? rental.startDate.split('T')[0] : '',
+      endDate: rental.endDate ? rental.endDate.split('T')[0] : '',
+      rentAmount: rental.rentAmount
+    });
+    setMessage('');
+  };
+
+  const fmtDate = (d) => new Date(d).toLocaleDateString('en-IN', {
+    day: 'numeric', month: 'long', year: 'numeric'
+  });
+
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+
+        {/* Modal Header */}
         <div className="modal-header">
-          <h2>{rental.flatName ? `${rental.flatName} - ` : ''}Flat {rental.flatNumber} Details</h2>
-          <button className="close-btn" onClick={onClose}>✕</button>
+          <h2>
+            {rental.flatName ? `${rental.flatName}` : `Flat ${rental.flatNumber}`}
+          </h2>
+          <button className="close-btn" onClick={onClose} aria-label="Close details">✕</button>
         </div>
 
+        {/* View Mode */}
         {!isEditing ? (
           <div className="rental-detail-view">
+            {message && (
+              <div className={`message ${message.includes('✅') ? 'success' : 'error'}`}>
+                {message}
+              </div>
+            )}
+
             {rental.flatName && (
               <div className="detail-row">
-                <label>Flat Name:</label>
+                <label>Property Name</label>
                 <span>{rental.flatName}</span>
               </div>
             )}
             <div className="detail-row">
-              <label>Flat Number:</label>
+              <label>Flat Number</label>
               <span>{rental.flatNumber}</span>
             </div>
             <div className="detail-row">
-              <label>Collaborators:</label>
-              <span>{users && rental.userIds ? rental.userIds.map(id => users.find(u => u.id === id)?.name || id).join(', ') : 'None'}</span>
+              <label>Owners / Collaborators</label>
+              <span>
+                {users && rental.userIds
+                  ? rental.userIds.map(id => users.find(u => u.id === id)?.name || id).join(', ')
+                  : 'None'}
+              </span>
             </div>
             <div className="detail-row">
-              <label>Start Date:</label>
-              <span>{new Date(rental.startDate).toLocaleDateString()}</span>
+              <label>Start Date</label>
+              <span>{fmtDate(rental.startDate)}</span>
             </div>
             <div className="detail-row">
-              <label>End Date:</label>
-              <span>{new Date(rental.endDate).toLocaleDateString()}</span>
+              <label>End Date</label>
+              <span>{fmtDate(rental.endDate)}</span>
             </div>
             <div className="detail-row">
-              <label>Current Rent:</label>
-              <span>₹{rental.rentAmount.toLocaleString()}</span>
+              <label>Monthly Rent</label>
+              <span>₹{rental.rentAmount.toLocaleString('en-IN')}</span>
             </div>
             <div className="detail-row">
-              <label>Status:</label>
-              <span>{rental.status}</span>
+              <label>Status</label>
+              <span style={{ textTransform: 'capitalize', fontWeight: 700 }}>{rental.status}</span>
             </div>
 
-            <div className="modal-footer" style={{ display: 'flex', gap: '10px' }}>
-              <button className="btn-primary" onClick={() => setIsEditing(true)}>
+            <div className="modal-footer">
+              <button className="btn-secondary" onClick={() => setIsEditing(true)}>
                 ✏️ Edit Agreement
               </button>
-              <button className="btn-primary" style={{ backgroundColor: '#27ae60' }} onClick={startNewAgreement}>
+              <button
+                className="btn-primary"
+                style={{ background: '#1e7e44', width: 'auto', flex: 1 }}
+                onClick={startNewAgreement}
+              >
                 📝 Start New Agreement
               </button>
             </div>
 
             <RentHistory rentalId={rental.id} />
           </div>
+
         ) : (
+          /* Edit Mode */
           <form onSubmit={handleUpdate} className="edit-form">
-            {isNewAgreement && (
-              <div className="message success" style={{ marginBottom: '15px' }}>
-                📝 Starting a new agreement — the old agreement details will be saved in the history.
+            {message && (
+              <div className={`message ${message.includes('✅') ? 'success' : 'error'}`}>
+                {message}
               </div>
             )}
+
+            {isNewAgreement && (
+              <div className="message success">
+                📝 Starting a new agreement — the previous agreement will be saved in history.
+              </div>
+            )}
+
             <div className="form-group">
-              <label>Flat Name</label>
+              <label htmlFor="rd-flat-name">Property Name</label>
               <input
+                id="rd-flat-name"
                 type="text"
                 name="flatName"
                 value={formData.flatName}
                 onChange={handleChange}
               />
             </div>
+
             <div className="form-group">
-              <label>Flat Number</label>
+              <label htmlFor="rd-flat-number">Flat Number</label>
               <input
+                id="rd-flat-number"
                 type="text"
                 name="flatNumber"
                 value={formData.flatNumber}
@@ -150,8 +195,11 @@ const RentalDetails = ({ rental, users, onClose, onUpdate }) => {
 
             <div className="form-row">
               <div className="form-group">
-                <label>{isNewAgreement ? 'New Start Date *' : 'Start Date'}</label>
+                <label htmlFor="rd-start-date">
+                  {isNewAgreement ? 'New Start Date *' : 'Start Date'}
+                </label>
                 <input
+                  id="rd-start-date"
                   type="date"
                   name="startDate"
                   value={formData.startDate}
@@ -159,10 +207,12 @@ const RentalDetails = ({ rental, users, onClose, onUpdate }) => {
                   required={isNewAgreement}
                 />
               </div>
-
               <div className="form-group">
-                <label>{isNewAgreement ? 'New End Date *' : 'End Date'}</label>
+                <label htmlFor="rd-end-date">
+                  {isNewAgreement ? 'New End Date *' : 'End Date'}
+                </label>
                 <input
+                  id="rd-end-date"
                   type="date"
                   name="endDate"
                   value={formData.endDate}
@@ -173,8 +223,11 @@ const RentalDetails = ({ rental, users, onClose, onUpdate }) => {
             </div>
 
             <div className="form-group">
-              <label>{isNewAgreement ? 'New Rent Amount (₹) *' : 'Rent Amount (₹)'}</label>
+              <label htmlFor="rd-rent-amount">
+                {isNewAgreement ? 'New Rent Amount (₹) *' : 'Rent Amount (₹)'}
+              </label>
               <input
+                id="rd-rent-amount"
                 type="number"
                 name="rentAmount"
                 value={formData.rentAmount}
@@ -186,10 +239,10 @@ const RentalDetails = ({ rental, users, onClose, onUpdate }) => {
             </div>
 
             <div className="form-group">
-              <label>Collaborators</label>
-              <div className="checkbox-group" style={{ display: 'flex', gap: '15px' }}>
+              <label>Owners / Collaborators</label>
+              <div className="checkbox-group">
                 {users && users.map(user => (
-                  <label key={user.id} style={{ display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 'normal' }}>
+                  <label key={user.id}>
                     <input
                       type="checkbox"
                       checked={selectedUsers.includes(user.id)}
@@ -202,11 +255,23 @@ const RentalDetails = ({ rental, users, onClose, onUpdate }) => {
             </div>
 
             <div className="modal-footer">
-              <button type="button" className="btn-secondary" onClick={() => { setIsEditing(false); setIsNewAgreement(false); }}>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={cancelEdit}
+              >
                 Cancel
               </button>
-              <button type="submit" disabled={loading} className="btn-primary">
-                {loading ? 'Saving...' : (isNewAgreement ? '📝 Save New Agreement' : 'Save Changes')}
+              <button
+                type="submit"
+                disabled={loading}
+                className="btn-primary"
+                style={{ width: 'auto', flex: 1 }}
+              >
+                {loading
+                  ? '⏳ Saving...'
+                  : isNewAgreement ? '📝 Save New Agreement' : '💾 Save Changes'
+                }
               </button>
             </div>
           </form>

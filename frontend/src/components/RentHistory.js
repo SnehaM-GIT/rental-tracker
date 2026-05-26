@@ -10,7 +10,7 @@ const RentHistory = ({ rentalId }) => {
 
   const fetchHistory = async () => {
     try {
-      const response = await fetch(`http://localhost:5000/api/rentals/${rentalId}/history`);
+      const response = await fetch(`/api/rentals/${rentalId}/history`);
       const data = await response.json();
       setHistory(data);
     } catch (error) {
@@ -21,40 +21,47 @@ const RentHistory = ({ rentalId }) => {
   };
 
   if (loading) return <div className="loading">Loading history...</div>;
-  if (history.length <= 1) return null; // Don't show if only the initial entry
+  // Only show if there's more than the initial entry
+  if (history.length <= 1) return null;
 
   const getEntryIcon = (entry) => {
     if (entry.type === 'agreement' && entry.note?.startsWith('Agreement ended')) return '🔴';
-    if (entry.type === 'agreement' && entry.note?.startsWith('New agreement')) return '🟢';
+    if (entry.type === 'agreement' && entry.note?.startsWith('New agreement'))    return '🟢';
     if (entry.type === 'rent_change') return '💰';
     return '📝';
   };
 
+  const fmtDate = (d) => new Date(d).toLocaleDateString('en-IN', {
+    day: 'numeric', month: 'short', year: 'numeric'
+  });
+
   return (
     <div className="rent-history-section">
-      <h3>📈 Agreement & Rent History</h3>
+      <h3>📈 Agreement &amp; Rent History</h3>
       <div className="history-timeline">
         {[...history].reverse().map((entry, index) => (
-          <div key={index} className="history-entry" style={{
-            borderLeft: entry.type === 'agreement' ? '3px solid #3498db' : '3px solid #95a5a6',
-            paddingLeft: '12px',
-            marginBottom: '12px'
-          }}>
-            <div className="history-date" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span>{getEntryIcon(entry)}</span>
-              <span>{new Date(entry.date).toLocaleDateString()}</span>
+          <div
+            key={index}
+            className="history-entry"
+            style={{
+              borderLeft: `4px solid ${entry.type === 'agreement' ? '#1a3c5e' : '#7f8fa4'}`
+            }}
+          >
+            <div className="history-date">
+              <span style={{ marginRight: 6 }}>{getEntryIcon(entry)}</span>
+              <span>{fmtDate(entry.date)}</span>
             </div>
             <div className="history-amount">
-              ₹{entry.amount?.toLocaleString()}
+              ₹{entry.amount?.toLocaleString('en-IN')}
             </div>
             {entry.startDate && entry.endDate && (
-              <div style={{ fontSize: '0.85em', color: '#7f8c8d' }}>
-                {new Date(entry.startDate).toLocaleDateString()} → {new Date(entry.endDate).toLocaleDateString()}
+              <div className="history-change">
+                {fmtDate(entry.startDate)} → {fmtDate(entry.endDate)}
               </div>
             )}
             {entry.previousAmount && (
               <div className="history-change">
-                (from ₹{entry.previousAmount.toLocaleString()})
+                (was ₹{entry.previousAmount.toLocaleString('en-IN')})
               </div>
             )}
             {entry.note && (

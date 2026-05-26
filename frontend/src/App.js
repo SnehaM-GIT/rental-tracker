@@ -10,29 +10,80 @@ function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [currentUser, setCurrentUser] = useState('user1');
   const [users, setUsers] = useState([]);
+  const [installPrompt, setInstallPrompt] = useState(null);
+  const [showInstallBanner, setShowInstallBanner] = useState(false);
 
   useEffect(() => {
     fetchUsers();
+
+    // PWA install prompt
+    const handler = (e) => {
+      e.preventDefault();
+      setInstallPrompt(e);
+      setShowInstallBanner(true);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
   }, []);
 
   const fetchUsers = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/users');
+      const response = await fetch('/api/users');
       const data = await response.json();
       setUsers(data);
+      if (data.length > 0) {
+        setCurrentUser(data[0].id);
+      }
     } catch (error) {
       console.error('Error fetching users:', error);
     }
   };
 
+  const handleInstall = async () => {
+    if (!installPrompt) return;
+    installPrompt.prompt();
+    const { outcome } = await installPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setShowInstallBanner(false);
+      setInstallPrompt(null);
+    }
+  };
+
+  const tabs = [
+    { id: 'dashboard', label: '📊 Dashboard' },
+    { id: 'rentals',   label: '📋 Rentals'   },
+    { id: 'expenses',  label: '💰 Expenses'  },
+    { id: 'settings',  label: '⚙️ Settings'  },
+  ];
+
   return (
     <div className="app-container">
+
+      {/* PWA Install Banner */}
+      {showInstallBanner && (
+        <div className="pwa-install-banner">
+          <span>📱 Add this app to your home screen for easy access!</span>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button onClick={handleInstall}>Install App</button>
+            <button
+              onClick={() => setShowInstallBanner(false)}
+              style={{ background: 'transparent', color: '#fff', border: '1px solid rgba(255,255,255,0.5)' }}
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Header */}
       <header className="app-header">
         <div className="header-content">
-          <h1>🏠 Rental & Expense Tracker</h1>
+          <h1>🏠 Rental &amp; Expense Tracker</h1>
           <div className="user-selector">
-            <select 
-              value={currentUser} 
+            <label htmlFor="user-select">Viewing as:</label>
+            <select
+              id="user-select"
+              value={currentUser}
               onChange={(e) => setCurrentUser(e.target.value)}
               className="user-dropdown"
             >
@@ -46,43 +97,38 @@ function App() {
         </div>
       </header>
 
-      <nav className="tab-navigation">
-        <button 
-          className={`tab-btn ${activeTab === 'dashboard' ? 'active' : ''}`}
-          onClick={() => setActiveTab('dashboard')}
-        >
-          📊 Dashboard
-        </button>
-        <button 
-          className={`tab-btn ${activeTab === 'rentals' ? 'active' : ''}`}
-          onClick={() => setActiveTab('rentals')}
-        >
-          📋 Rentals
-        </button>
-        <button 
-          className={`tab-btn ${activeTab === 'expenses' ? 'active' : ''}`}
-          onClick={() => setActiveTab('expenses')}
-        >
-          💰 Expenses
-        </button>
-        <button 
-          className={`tab-btn ${activeTab === 'settings' ? 'active' : ''}`}
-          onClick={() => setActiveTab('settings')}
-        >
-          ⚙️ Settings
-        </button>
+      {/* Navigation */}
+      <nav className="tab-navigation" aria-label="Main navigation">
+        {tabs.map(tab => (
+          <button
+            key={tab.id}
+            id={`tab-${tab.id}`}
+            className={`tab-btn ${activeTab === tab.id ? 'active' : ''}`}
+            onClick={() => setActiveTab(tab.id)}
+            aria-selected={activeTab === tab.id}
+          >
+            {tab.label}
+          </button>
+        ))}
       </nav>
 
-      <main className="app-main">
-        {activeTab === 'dashboard' && <Dashboard currentUser={currentUser} users={users} />}
+      {/* Main Content */}
+      <main className="app-main" id="main-content">
+        {activeTab === 'dashboard' && (
+          <Dashboard currentUser={currentUser} users={users} />
+        )}
         {activeTab === 'rentals' && (
           <div className="rentals-section">
-            <RentalForm currentUser={currentUser} users={users} onSuccess={() => {}} />
+            <RentalForm currentUser={currentUser} users={users} onSuccess={fetchUsers} />
             <RentalList currentUser={currentUser} users={users} />
           </div>
         )}
-        {activeTab === 'expenses' && <ExpenseTracker currentUser={currentUser} users={users} />}
-        {activeTab === 'settings' && <UserSettings userId={currentUser} onUpdate={fetchUsers} />}
+        {activeTab === 'expenses' && (
+          <ExpenseTracker currentUser={currentUser} users={users} />
+        )}
+        {activeTab === 'settings' && (
+          <UserSettings userId={currentUser} onUpdate={fetchUsers} />
+        )}
       </main>
     </div>
   );

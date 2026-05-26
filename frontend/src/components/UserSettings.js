@@ -5,7 +5,7 @@ const UserSettings = ({ userId, onUpdate }) => {
     name: '',
     email: '',
     phone: '',
-    whatsappNumber: ''
+    notifyEmail: ''
   });
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
@@ -16,15 +16,15 @@ const UserSettings = ({ userId, onUpdate }) => {
 
   const fetchUserData = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/users');
+      const response = await fetch('/api/users');
       const users = await response.json();
       const user = users.find(u => u.id === userId);
       if (user) {
         setFormData({
-          name: user.name,
-          email: user.email,
-          phone: user.phone,
-          whatsappNumber: user.whatsappNumber
+          name: user.name || '',
+          email: user.email || '',
+          phone: user.phone || '',
+          notifyEmail: user.notifyEmail || user.email || ''
         });
       }
     } catch (error) {
@@ -48,16 +48,16 @@ const UserSettings = ({ userId, onUpdate }) => {
     setMessage('');
 
     try {
-      const response = await fetch(`http://localhost:5000/api/users/${userId}`, {
+      const response = await fetch(`/api/users/${userId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
       });
 
       if (response.ok) {
-        setMessage('✅ Settings updated successfully!');
+        setMessage('✅ Settings saved successfully!');
         onUpdate();
-        setTimeout(() => setMessage(''), 3000);
+        setTimeout(() => setMessage(''), 4000);
       } else {
         setMessage('❌ Error updating settings');
       }
@@ -71,32 +71,41 @@ const UserSettings = ({ userId, onUpdate }) => {
   return (
     <div className="settings-container">
       <h2>⚙️ User Settings</h2>
-      {message && <div className={`message ${message.includes('✅') ? 'success' : 'error'}`}>{message}</div>}
+      {message && (
+        <div className={`message ${message.includes('✅') ? 'success' : 'error'}`}>
+          {message}
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="settings-form">
         <div className="form-group">
-          <label>Full Name</label>
+          <label htmlFor="settings-name">Full Name</label>
           <input
+            id="settings-name"
             type="text"
             name="name"
             value={formData.name}
             onChange={handleChange}
+            placeholder="Your full name"
           />
         </div>
 
         <div className="form-group">
-          <label>Email</label>
+          <label htmlFor="settings-email">Email Address</label>
           <input
+            id="settings-email"
             type="email"
             name="email"
             value={formData.email}
             onChange={handleChange}
+            placeholder="your@email.com"
           />
         </div>
 
         <div className="form-group">
-          <label>Phone Number</label>
+          <label htmlFor="settings-phone">Phone Number</label>
           <input
+            id="settings-phone"
             type="tel"
             name="phone"
             value={formData.phone}
@@ -106,19 +115,26 @@ const UserSettings = ({ userId, onUpdate }) => {
         </div>
 
         <div className="form-group">
-          <label>WhatsApp Number (for reminders)</label>
+          <label htmlFor="settings-notify-email">📧 Reminder Email</label>
           <input
-            type="tel"
-            name="whatsappNumber"
-            value={formData.whatsappNumber}
+            id="settings-notify-email"
+            type="email"
+            name="notifyEmail"
+            value={formData.notifyEmail}
             onChange={handleChange}
-            placeholder="+91XXXXXXXXXX"
+            placeholder="email where reminders will be sent"
           />
         </div>
 
         <div className="settings-info">
-          <p><strong>📱 Note:</strong> Your WhatsApp number will be used to send rental agreement reminders 2 days before the end date.</p>
-          <p><strong>📅 Note:</strong> Your email can be used to add events to your Google Calendar automatically.</p>
+          <p>
+            <strong>📧 Email Reminders:</strong> You will receive an email 2 days before any
+            rental agreement ends. Make sure your Reminder Email above is correct.
+          </p>
+          <p>
+            <strong>⚙️ Setup:</strong> The server administrator must configure SMTP settings
+            in the backend <code>.env</code> file to activate email delivery.
+          </p>
         </div>
 
         <button type="submit" disabled={loading} className="btn-primary">

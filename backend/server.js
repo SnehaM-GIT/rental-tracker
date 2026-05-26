@@ -4,16 +4,25 @@ const cron = require('node-cron');
 require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
-const twilio = require('twilio');
+const nodemailer = require('nodemailer');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Twilio Setup
-const accountSid = process.env.TWILIO_ACCOUNT_SID || 'your_account_sid';
-const authToken = process.env.TWILIO_AUTH_TOKEN || 'your_auth_token';
-const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER || 'whatsapp:+14155238886'; // default sandbox number
-const twilioClient = (accountSid !== 'your_account_sid') ? twilio(accountSid, authToken) : null;
+// ==================== EMAIL SETUP ====================
+
+const createTransporter = () => {
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) return null;
+  return nodemailer.createTransporter({
+    host: process.env.SMTP_HOST || 'smtp.gmail.com',
+    port: parseInt(process.env.SMTP_PORT || '587'),
+    secure: false,
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS
+    }
+  });
+};
 
 // Middleware
 app.use(cors());
@@ -45,14 +54,14 @@ const initializeDb = () => {
         name: 'Mani',
         email: 'mani@example.com',
         phone: '+91XXXXXXXXXX',
-        whatsappNumber: '+91XXXXXXXXXX'
+        notifyEmail: ''
       },
       {
         id: 'user2',
         name: 'Shankar',
         email: 'shankar@example.com',
         phone: '+91XXXXXXXXXX',
-        whatsappNumber: '+91XXXXXXXXXX'
+        notifyEmail: ''
       }
     ], null, 2));
   }
@@ -83,6 +92,30 @@ try {
   }
 } catch (err) {
   console.error('Migration error:', err);
+}
+
+// Migrate users: add notifyEmail if missing
+try {
+  if (fs.existsSync(usersDbPath)) {
+    const users = JSON.parse(fs.readFileSync(usersDbPath, 'utf8'));
+    let modified = false;
+    const migrated = users.map(u => {
+      if (u.whatsappNumber !== undefined && u.notifyEmail === undefined) {
+        u.notifyEmail = u.email || '';
+        delete u.whatsappNumber;
+        modified = true;
+      } else if (u.notifyEmail === undefined) {
+        u.notifyEmail = u.email || '';
+        modified = true;
+      }
+      return u;
+    });
+    if (modified) {
+      fs.writeFileSync(usersDbPath, JSON.stringify(migrated, null, 2));
+    }
+  }
+} catch (err) {
+  console.error('User migration error:', err);
 }
 
 // Helper functions to read/write JSON
@@ -169,7 +202,6 @@ app.put('/api/rentals/:id', (req, res) => {
 
     const rental = rentals[rentalIndex];
 
-    // If this is a new agreement, log the old agreement details in history
     if (isNewAgreement) {
       rental.rentHistory.push({
         type: 'agreement',
@@ -192,7 +224,6 @@ app.put('/api/rentals/:id', (req, res) => {
       if (endDate) rental.endDate = new Date(endDate);
       rental.status = 'active';
     } else {
-      // Normal edit — track rent changes
       if (rentAmount && parseFloat(rentAmount) !== rental.rentAmount) {
         rental.rentHistory.push({
           type: 'rent_change',
@@ -335,7 +366,7 @@ app.get('/api/users', (req, res) => {
 // Update user contact info
 app.put('/api/users/:id', (req, res) => {
   try {
-    const { name, email, phone, whatsappNumber } = req.body;
+    const { name, email, phone, notifyEmail } = req.body;
     const users = readUsers();
     const userIndex = users.findIndex(u => u.id === req.params.id);
 
@@ -345,7 +376,7 @@ app.put('/api/users/:id', (req, res) => {
     if (name) user.name = name;
     if (email) user.email = email;
     if (phone) user.phone = phone;
-    if (whatsappNumber) user.whatsappNumber = whatsappNumber;
+    if (notifyEmail !== undefined) user.notifyEmail = notifyEmail;
 
     users[userIndex] = user;
     writeUsers(users);
@@ -355,45 +386,81 @@ app.put('/api/users/:id', (req, res) => {
   }
 });
 
-// ==================== NOTIFICATION SERVICE ====================
+// ==================== EMAIL NOTIFICATION SERVICE ====================
 
-const sendReminder = async (rental, user) => {
-  try {
-    const flatStr = rental.flatName ? `${rental.flatName} - Flat ${rental.flatNumber}` : `Flat ${rental.flatNumber}`;
-    const endDateStr = new Date(rental.endDate).toLocaleDateString();
-    const rentStr = rental.rentAmount.toLocaleString();
-    
-    console.log('\n' + '='.repeat(60));
-    console.log('🔔 REMINDER NOTIFICATION');
-    console.log('='.repeat(60));
-    console.log(`📍 Flat: ${flatStr}`);
-    console.log(`👤 User: ${user.name}`);
-    console.log(`💰 Rent Amount: ₹${rentStr}`);
-    console.log(`📅 Agreement Ends On: ${endDateStr}`);
-    console.log(`⏱️  Time Left: 2 days`);
-    console.log('');
-    
-    // Attempt WhatsApp integration via Twilio
-    if (twilioClient && user.whatsappNumber && !user.whatsappNumber.includes('XXXXXXXXXX')) {
-      const message = `🔔 *Rental Agreement Reminder*\n\nHi ${user.name},\nYour rental agreement for *${flatStr}* is ending in 2 days on *${endDateStr}*.\n\nCurrent Rent Amount: ₹${rentStr}\n\nPlease review and renew your agreement if necessary.`;
-      
-      await twilioClient.messages.create({
-        body: message,
-        from: twilioPhoneNumber,
-        to: `whatsapp:${user.whatsappNumber}` // must be in E.164 format, e.g., +919876543210
-      });
-      console.log(`✅ WhatsApp reminder sent successfully to ${user.name} at ${user.whatsappNumber} via Twilio!`);
-    } else {
-      console.log('📱 Notification Channels check:');
-      console.log(`  ! WhatsApp: ${user.whatsappNumber} (Dummy number or Twilio not configured)`);
-      console.log('💡 To send real WhatsApp messages:');
-      console.log('   1. Add TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER to backend/.env');
-      console.log('   2. Update the user\'s whatsappNumber to a valid real number in Settings.');
-    }
+const sendEmailReminder = async (rental, user) => {
+  const flatStr = rental.flatName ? `${rental.flatName} - Flat ${rental.flatNumber}` : `Flat ${rental.flatNumber}`;
+  const endDateStr = new Date(rental.endDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
+  const rentStr = rental.rentAmount.toLocaleString('en-IN');
+
+  console.log('\n' + '='.repeat(60));
+  console.log('🔔 REMINDER NOTIFICATION');
+  console.log('='.repeat(60));
+  console.log(`📍 Flat: ${flatStr}`);
+  console.log(`👤 User: ${user.name}`);
+  console.log(`💰 Rent Amount: ₹${rentStr}`);
+  console.log(`📅 Agreement Ends On: ${endDateStr}`);
+  console.log(`⏱️  Time Left: 2 days`);
+  console.log('');
+
+  const notifyEmail = user.notifyEmail || user.email;
+
+  if (!notifyEmail || notifyEmail.includes('example.com')) {
+    console.log('📧 Email notification skipped: No valid email configured.');
+    console.log('💡 To enable email reminders:');
+    console.log('   1. Add SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS to backend/.env');
+    console.log(`   2. Set notifyEmail for ${user.name} in Settings.`);
     console.log('='.repeat(60) + '\n');
-  } catch (error) {
-    console.error('Error sending reminder via Twilio:', error);
+    return;
   }
+
+  const transporter = createTransporter();
+  if (!transporter) {
+    console.log('📧 Email notification skipped: SMTP not configured in .env');
+    console.log('💡 Add SMTP_USER and SMTP_PASS to backend/.env to enable emails.');
+    console.log('='.repeat(60) + '\n');
+    return;
+  }
+
+  try {
+    const htmlBody = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #f9f9f9; border-radius: 10px;">
+        <div style="background: #2c3e50; color: white; padding: 20px; border-radius: 8px 8px 0 0; text-align: center;">
+          <h1 style="margin: 0; font-size: 24px;">🏠 Rental Agreement Reminder</h1>
+        </div>
+        <div style="background: white; padding: 24px; border-radius: 0 0 8px 8px; border: 1px solid #e0e0e0;">
+          <p style="font-size: 18px; color: #333;">Dear <strong>${user.name}</strong>,</p>
+          <p style="font-size: 16px; color: #555;">Your rental agreement is ending in <strong style="color: #e74c3c;">2 days</strong>.</p>
+          
+          <div style="background: #f5f5f5; padding: 16px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #2c3e50;">
+            <p style="margin: 8px 0; font-size: 16px;"><strong>📍 Property:</strong> ${flatStr}</p>
+            <p style="margin: 8px 0; font-size: 16px;"><strong>💰 Monthly Rent:</strong> ₹${rentStr}</p>
+            <p style="margin: 8px 0; font-size: 16px;"><strong>📅 Agreement Ends:</strong> ${endDateStr}</p>
+          </div>
+          
+          <p style="font-size: 16px; color: #555;">Please log in to the Rental Tracker app to review and renew your agreement if needed.</p>
+          
+          <p style="font-size: 14px; color: #999; margin-top: 30px; border-top: 1px solid #eee; padding-top: 15px;">
+            This is an automated reminder from your Rental & Expense Tracker.
+          </p>
+        </div>
+      </div>
+    `;
+
+    await transporter.sendMail({
+      from: `"Rental Tracker" <${process.env.SMTP_USER}>`,
+      to: notifyEmail,
+      subject: `🔔 Rental Reminder: ${flatStr} agreement ends in 2 days`,
+      html: htmlBody,
+      text: `Hi ${user.name},\n\nYour rental agreement for ${flatStr} ends in 2 days on ${endDateStr}.\nCurrent rent: ₹${rentStr}\n\nPlease review and renew your agreement if necessary.`
+    });
+
+    console.log(`✅ Email reminder sent to ${user.name} at ${notifyEmail}`);
+  } catch (error) {
+    console.error(`❌ Failed to send email to ${notifyEmail}:`, error.message);
+  }
+
+  console.log('='.repeat(60) + '\n');
 };
 
 // Check for upcoming reminders every hour
@@ -412,7 +479,7 @@ cron.schedule('0 * * * *', async () => {
         rental.userIds.forEach(uid => {
           const user = users.find(u => u.id === uid);
           if (user) {
-            sendReminder(rental, user);
+            sendEmailReminder(rental, user);
           }
         });
       }
@@ -422,10 +489,37 @@ cron.schedule('0 * * * *', async () => {
   }
 });
 
+// Manual trigger endpoint (for testing)
+app.post('/api/test-reminder/:rentalId', async (req, res) => {
+  try {
+    const rentals = readRentals();
+    const users = readUsers();
+    const rental = rentals.find(r => r.id === req.params.rentalId);
+    if (!rental) return res.status(404).json({ error: 'Rental not found' });
+
+    const results = [];
+    for (const uid of rental.userIds || []) {
+      const user = users.find(u => u.id === uid);
+      if (user) {
+        await sendEmailReminder(rental, user);
+        results.push({ user: user.name, email: user.notifyEmail || user.email });
+      }
+    }
+    res.json({ message: 'Test reminder triggered', results });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ==================== HEALTH CHECK ====================
 
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'Server is running' });
+  const transporter = createTransporter();
+  res.json({
+    status: 'Server is running',
+    emailConfigured: !!transporter,
+    smtpUser: process.env.SMTP_USER ? `${process.env.SMTP_USER.substring(0, 3)}***` : 'not set'
+  });
 });
 
 // Start server
@@ -447,7 +541,9 @@ app.listen(PORT, () => {
   console.log('  DEL  /api/expenses/:id         - Delete expense');
   console.log('  GET  /api/users                - Get all users');
   console.log('  PUT  /api/users/:id            - Update user');
+  console.log('  POST /api/test-reminder/:id    - Test email reminder');
   console.log('');
+  console.log(`📧 Email Notifications: ${process.env.SMTP_USER ? '✅ Configured' : '⚠️  Not configured (add SMTP_* to .env)'}`);
   console.log('⏰ Reminder Check: Every hour at :00');
   console.log('='.repeat(60) + '\n');
 });
