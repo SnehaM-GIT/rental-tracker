@@ -103,9 +103,8 @@ function App() {
           <button
             key={tab.id}
             id={`tab-${tab.id}`}
-            className={`tab-btn ${activeTab === tab.id ? 'active' : ''}`}
-            onClick={() => setActiveTab(tab.id)}
-            aria-selected={activeTab === tab.id}
+       className={`tab-btn ${activeTab === tab.id ? 'active' : ''}`}
+        onClick={() => setActiveTab(tab.id)}
           >
             {tab.label}
           </button>
