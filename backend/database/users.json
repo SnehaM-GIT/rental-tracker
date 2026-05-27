@@ -2,15 +2,15 @@
   {
     "id": "user1",
     "name": "Mani",
-    "email": "mani@example.com",
+    "email": "mani@realemail.com",
     "phone": "+91XXXXXXXXXX",
-    "notifyEmail": ""
+    "notifyEmail": "mani@realemail.com"
   },
   {
     "id": "user2",
     "name": "Shankar",
-    "email": "shankar@example.com",
+    "email": "shankar@realemail.com",
     "phone": "+91XXXXXXXXXX",
-    "notifyEmail": ""
+    "notifyEmail": "shankar@realemail.com"
   }
 ]
