@@ -361,7 +361,7 @@ body {
 }
 
 /* ============================================
-   RENTAL CARDS
+   RENTAL CARDS (kept for dashboard use)
    ============================================ */
 
 .rental-list-container h2 {
@@ -1069,4 +1069,159 @@ body {
   font-size: var(--text-sm);
   cursor: pointer;
   white-space: nowrap;
+}
+
+/* ============================================
+   RENTAL TABLE VIEW
+   ============================================ */
+
+.rental-table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.rental-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.rental-table thead tr {
+  background: var(--color-primary);
+  color: #ffffff;
+}
+
+.rental-table thead th {
+  padding: 14px 16px;
+  text-align: left;
+  font-weight: 700;
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.rental-table thead th:first-child {
+  border-radius: var(--radius-md) 0 0 0;
+  width: 40px;
+}
+
+.rental-table thead th:last-child {
+  border-radius: 0 var(--radius-md) 0 0;
+}
+
+.rental-table-row {
+  cursor: pointer;
+  border-bottom: 1px solid var(--color-border);
+  transition: background 0.15s ease;
+}
+
+.rental-table-row:last-child {
+  border-bottom: none;
+}
+
+.rental-table-row:hover {
+  background: #f0f4fa;
+}
+
+.rental-table td {
+  padding: 14px 16px;
+  vertical-align: middle;
+  font-size: var(--text-sm);
+  color: var(--color-text);
+}
+
+.col-index {
+  color: var(--color-text-muted) !important;
+  font-weight: 600;
+  width: 40px;
+}
+
+.col-name {
+  font-weight: 600;
+  color: var(--color-primary) !important;
+  min-width: 120px;
+}
+
+.col-flat {
+  min-width: 80px;
+}
+
+.col-rent {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.col-date {
+  white-space: nowrap;
+  color: var(--color-text-muted) !important;
+}
+
+.col-days {
+  text-align: center;
+  white-space: nowrap;
+}
+
+.col-status {
+  white-space: nowrap;
+}
+
+.col-action {
+  width: 80px;
+  text-align: right;
+}
+
+.status-pill {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* Mobile: stack as cards on small screens */
+@media (max-width: 640px) {
+  .rental-table thead {
+    display: none;
+  }
+
+  .rental-table,
+  .rental-table tbody,
+  .rental-table tr,
+  .rental-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .rental-table-row {
+    padding: var(--space-md);
+    margin-bottom: var(--space-sm);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+  }
+
+  .rental-table td {
+    padding: 6px 0;
+    border: none;
+  }
+
+  .rental-table td::before {
+    content: attr(data-label);
+    font-weight: 700;
+    color: var(--color-text-muted);
+    font-size: var(--text-xs);
+    display: block;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 2px;
+  }
+
+  .col-index,
+  .col-action {
+    display: none;
+  }
 }

@@ -30,10 +30,14 @@ const RentalList = ({ currentUser, users }) => {
   };
 
   const getStatus = (daysUntilEnd) => {
-    if (daysUntilEnd < 0)   return { label: 'Expired',       color: '#b72b2b' };
-    if (daysUntilEnd <= 7)  return { label: '⚠️ Ending Soon', color: '#e67e22' };
-    return                         { label: '✅ Active',       color: '#1e7e44' };
+    if (daysUntilEnd < 0)  return { label: 'Expired',      color: '#b72b2b', bg: '#fde8e8' };
+    if (daysUntilEnd <= 7) return { label: '⚠️ Ending Soon', color: '#b45309', bg: '#fef3c7' };
+    return                        { label: '✅ Active',      color: '#1e7e44', bg: '#e8f5ee' };
   };
+
+  const fmtDate = (d) => new Date(d).toLocaleDateString('en-IN', {
+    day: 'numeric', month: 'short', year: '2-digit'
+  });
 
   if (loading) return <div className="loading">⏳ Loading rentals...</div>;
   if (rentals.length === 0) return (
@@ -47,64 +51,65 @@ const RentalList = ({ currentUser, users }) => {
     <div className="rental-list-container">
       <h2>Your Rental Agreements</h2>
 
-      <div className="rental-grid">
-        {rentals.map(rental => {
-          const daysUntilEnd = getDaysUntilEnd(rental.endDate);
-          const status = getStatus(daysUntilEnd);
-
-          return (
-            <div
-              key={rental.id}
-              className="rental-card"
-              onClick={() => setSelectedRental(rental)}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => e.key === 'Enter' && setSelectedRental(rental)}
-              aria-label={`View details for ${rental.flatName || ''} Flat ${rental.flatNumber}`}
-            >
-              <div className="card-header">
-                <h3>{rental.flatName ? `${rental.flatName}` : `Flat ${rental.flatNumber}`}</h3>
-                <span className="status-badge" style={{ backgroundColor: status.color }}>
-                  {status.label}
-                </span>
-              </div>
-
-              <div className="card-body">
-                <div className="info-row">
-                  <span>🏢 Flat No.</span>
-                  <strong>{rental.flatNumber}</strong>
-                </div>
-                <div className="info-row">
-                  <span>💰 Monthly Rent</span>
-                  <strong>₹{rental.rentAmount.toLocaleString('en-IN')}</strong>
-                </div>
-                <div className="info-row">
-                  <span>📅 Period</span>
-                  <strong style={{ fontSize: '0.85em' }}>
-                    {new Date(rental.startDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' })}
-                    {' → '}
-                    {new Date(rental.endDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' })}
-                  </strong>
-                </div>
-                <div className="info-row">
-                  <span>⏱️ Days Left</span>
-                  <strong style={{ color: status.color }}>
-                    {daysUntilEnd < 0 ? 'Expired' : `${daysUntilEnd} days`}
-                  </strong>
-                </div>
-              </div>
-
-              <div className="card-footer">
-                <button
-                  className="btn-secondary"
-                  onClick={(e) => { e.stopPropagation(); setSelectedRental(rental); }}
+      <div className="rental-table-wrapper">
+        <table className="rental-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Property</th>
+              <th>Flat No.</th>
+              <th>Monthly Rent</th>
+              <th>Start Date</th>
+              <th>End Date</th>
+              <th>Days Left</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {rentals.map((rental, index) => {
+              const daysUntilEnd = getDaysUntilEnd(rental.endDate);
+              const status = getStatus(daysUntilEnd);
+              return (
+                <tr
+                  key={rental.id}
+                  onClick={() => setSelectedRental(rental)}
+                  className="rental-table-row"
                 >
-                  📄 View Details
-                </button>
-              </div>
-            </div>
-          );
-        })}
+                  <td className="col-index">{index + 1}</td>
+                  <td className="col-name">
+                    {rental.flatName || '—'}
+                  </td>
+                  <td className="col-flat">
+                    <strong>{rental.flatNumber}</strong>
+                  </td>
+                  <td className="col-rent">
+                    ₹{rental.rentAmount.toLocaleString('en-IN')}
+                  </td>
+                  <td className="col-date">{fmtDate(rental.startDate)}</td>
+                  <td className="col-date">{fmtDate(rental.endDate)}</td>
+                  <td className="col-days" style={{ color: status.color, fontWeight: 700 }}>
+                    {daysUntilEnd < 0 ? 'Expired' : `${daysUntilEnd}d`}
+                  </td>
+                  <td className="col-status">
+                    <span className="status-pill" style={{ color: status.color, background: status.bg }}>
+                      {status.label}
+                    </span>
+                  </td>
+                  <td className="col-action">
+                    <button
+                      className="btn-secondary"
+                      style={{ padding: '8px 14px', fontSize: '14px', minHeight: '36px' }}
+                      onClick={(e) => { e.stopPropagation(); setSelectedRental(rental); }}
+                    >
+                      View
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
 
       {selectedRental && (
