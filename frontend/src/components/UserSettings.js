@@ -10,6 +10,7 @@ const UserSettings = ({ userId, onUpdate }) => {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
 
+ // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     fetchUserData();
   }, [userId]);

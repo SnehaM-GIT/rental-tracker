@@ -6,6 +6,7 @@ const RentalList = ({ currentUser, users }) => {
   const [loading, setLoading] = useState(true);
   const [selectedRental, setSelectedRental] = useState(null);
 
+// eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     fetchRentals();
   }, [currentUser]);

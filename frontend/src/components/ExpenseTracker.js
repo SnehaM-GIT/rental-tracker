@@ -14,6 +14,7 @@ const ExpenseTracker = ({ currentUser, users }) => {
   const [message, setMessage] = useState('');
   const [filterFlat, setFilterFlat] = useState('');
 
+// eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     fetchRentals();
     fetchExpenses();

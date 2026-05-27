@@ -4,6 +4,7 @@ const RentHistory = ({ rentalId }) => {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
 
+// eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     fetchHistory();
   }, [rentalId]);

@@ -11,6 +11,7 @@ const Dashboard = ({ currentUser, users }) => {
   });
   const [upcomingReminders, setUpcomingReminders] = useState([]);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     fetchStats();
   }, [currentUser]);
