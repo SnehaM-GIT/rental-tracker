@@ -4,13 +4,13 @@
     "name": "Mani",
     "email": "mani@example.com",
     "phone": "+91XXXXXXXXXX",
-    "notifyEmail": "mani@example.com"
+    "notifyEmail": ""
   },
   {
     "id": "user2",
     "name": "Shankar",
     "email": "shankar@example.com",
     "phone": "+91XXXXXXXXXX",
-    "notifyEmail": "shankar@example.com"
+    "notifyEmail": ""
   }
 ]

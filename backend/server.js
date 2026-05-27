@@ -13,7 +13,7 @@ const PORT = process.env.PORT || 5000;
 
 const createTransporter = () => {
   if (!process.env.SMTP_USER || !process.env.SMTP_PASS) return null;
-  return nodemailer.createTransporter({
+  return nodemailer.createTransport({
     host: process.env.SMTP_HOST || 'smtp.gmail.com',
     port: parseInt(process.env.SMTP_PORT || '587'),
     secure: false,
@@ -501,8 +501,7 @@ app.post('/api/test-reminder/:rentalId', async (req, res) => {
     for (const uid of rental.userIds || []) {
       const user = users.find(u => u.id === uid);
       if (user) {
-        await sendEmailReminder(rental, user);
-        results.push({ user: user.name, email: user.notifyEmail || user.email });
+        await sendEmailReminder(rental, user);        results.push({ user: user.name, email: user.notifyEmail || user.email });
       }
     }
     res.json({ message: 'Test reminder triggered', results });
