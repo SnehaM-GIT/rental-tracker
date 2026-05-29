@@ -60,6 +60,7 @@ const RentalList = ({ currentUser, users }) => {
               <th>Property</th>
               <th>Flat No.</th>
               <th>Monthly Rent</th>
+              <th> Advance</th>
               <th>Start Date</th>
               <th>End Date</th>
               <th>Days Left</th>

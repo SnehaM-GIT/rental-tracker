@@ -139,6 +139,10 @@ const RentalDetails = ({ rental, users, onClose, onUpdate }) => {
               <label>Status</label>
               <span style={{ textTransform: 'capitalize', fontWeight: 700 }}>{rental.status}</span>
             </div>
+            <div className="detail-row">
+  <label>Advance Amount</label>
+  <span>{rental.advanceAmount ? `₹${rental.advanceAmount.toLocaleString('en-IN')}` : 'Not recorded'}</span>
+</div>
 
             <div className="modal-footer">
               <button className="btn-secondary" onClick={() => setIsEditing(true)}>
@@ -233,7 +237,7 @@ const RentalDetails = ({ rental, users, onClose, onUpdate }) => {
                 value={formData.rentAmount}
                 onChange={handleChange}
                 min="0"
-                step="100"
+                step="1"
                 required={isNewAgreement}
               />
             </div>

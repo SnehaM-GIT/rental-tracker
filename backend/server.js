@@ -156,7 +156,7 @@ app.get('/api/rentals/:id', (req, res) => {
 // Create new rental
 app.post('/api/rentals', (req, res) => {
   try {
-    const { flatNumber, flatName, startDate, endDate, rentAmount, userIds } = req.body;
+    const { flatNumber, flatName, startDate, endDate, rentAmount, advanceAmount, userIds } = req.body;
     
     if (!flatNumber || !startDate || !endDate || !rentAmount || !userIds || !userIds.length) {
       return res.status(400).json({ error: 'Missing required fields' });
@@ -167,6 +167,7 @@ app.post('/api/rentals', (req, res) => {
       id: Date.now().toString(),
       flatNumber,
       flatName: flatName || '',
+       advanceAmount: advanceAmount || 0,
       startDate: new Date(startDate),
       endDate: new Date(endDate),
       rentAmount,

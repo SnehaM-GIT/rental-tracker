@@ -6,7 +6,8 @@ const RentalForm = ({ currentUser, users, onSuccess }) => {
     flatNumber: '',
     startDate: '',
     endDate: '',
-    rentAmount: ''
+    rentAmount: '',
+    advanceAmount: ''
   });
   const [selectedUsers, setSelectedUsers] = useState([currentUser]);
   const [loading, setLoading] = useState(false);
@@ -25,38 +26,41 @@ const RentalForm = ({ currentUser, users, onSuccess }) => {
     );
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setMessage('');
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  setLoading(true);
+  setMessage('');
 
-    try {
-      const response = await fetch('/api/rentals', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...formData,
-          rentAmount: parseFloat(formData.rentAmount),
-          userIds: selectedUsers.length > 0 ? selectedUsers : [currentUser]
-        })
-      });
+  try {
+    const response = await fetch('/api/rentals', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...formData,
+        rentAmount: parseFloat(formData.rentAmount),
+        advanceAmount: formData.advanceAmount ? parseFloat(formData.advanceAmount) : 0,
+        userIds: selectedUsers.length > 0 ? selectedUsers : [currentUser]
+      })
+    });
 
-      if (response.ok) {
-        setMessage('✅ Rental agreement added successfully!');
-        setFormData({ flatName: '', flatNumber: '', startDate: '', endDate: '', rentAmount: '' });
-        setSelectedUsers([currentUser]);
-        onSuccess();
-        setTimeout(() => setMessage(''), 4000);
-      } else {
-        const err = await response.json();
-        setMessage(`❌ Error: ${err.error || 'Could not add rental.'}`);
-      }
-    } catch (error) {
-      setMessage(`❌ Error: ${error.message}`);
-    } finally {
-      setLoading(false);
+    const text = await response.text();
+    const data = text ? JSON.parse(text) : {};
+
+    if (response.ok) {
+      setMessage('✅ Rental agreement added successfully!');
+      setFormData({ flatName: '', flatNumber: '', startDate: '', endDate: '', rentAmount: '', advanceAmount: '' });
+      setSelectedUsers([currentUser]);
+      onSuccess();
+      setTimeout(() => setMessage(''), 4000);
+    } else {
+      setMessage(`❌ Error: ${data.error || 'Could not add rental.'}`);
     }
-  };
+  } catch (error) {
+    setMessage(`❌ Error: ${error.message}`);
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div className="form-container">
@@ -130,8 +134,22 @@ const RentalForm = ({ currentUser, users, onSuccess }) => {
             onChange={handleChange}
             placeholder="e.g. 10000"
             min="0"
-            step="100"
+            step="1"
             required
+          />
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="rf-advance-amount">Advance Amount (₹)</label>
+          <input
+            id="rf-advance-amount"
+            type="number"
+            name="advanceAmount"
+            value={formData.advanceAmount}
+            onChange={handleChange}
+            placeholder="e.g. 50000 (optional)"
+            min="0"
+            step="1"
           />
         </div>
 
