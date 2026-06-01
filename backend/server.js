@@ -2,12 +2,41 @@ const express = require('express');
 const cors = require('cors');
 const cron = require('node-cron');
 require('dotenv').config();
-const fs = require('fs');
-const path = require('path');
+const mongoose = require('mongoose');
 const nodemailer = require('nodemailer');
+
+const Rental = require('./models/Rental');
+const Expense = require('./models/Expense');
+const User = require('./models/User');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+// ==================== MONGODB CONNECTION ====================
+
+mongoose.connect(process.env.MONGODB_URI)
+  .then(() => console.log('✅ Connected to MongoDB Atlas'))
+  .catch(err => {
+    console.error('❌ MongoDB connection error:', err.message);
+    process.exit(1);
+  });
+
+// ==================== SEED DEFAULT USERS ====================
+
+const seedUsers = async () => {
+  try {
+    const count = await User.countDocuments();
+    if (count === 0) {
+      await User.insertMany([
+        { _id: 'user1', name: 'Mani', email: 'mani@example.com', phone: '+91XXXXXXXXXX', notifyEmail: '' },
+        { _id: 'user2', name: 'Shankar', email: 'shankar@example.com', phone: '+91XXXXXXXXXX', notifyEmail: '' }
+      ]);
+      console.log('🌱 Default users seeded (Mani & Shankar)');
+    }
+  } catch (err) {
+    console.error('Seed error:', err.message);
+  }
+};
 
 // ==================== EMAIL SETUP ====================
 
@@ -24,14 +53,14 @@ const createTransporter = () => {
   });
 };
 
-// Middleware
+// ==================== MIDDLEWARE ====================
+
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',')
   : [];
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow requests with no origin (mobile apps, curl, Render health checks)
     if (!origin) return callback(null, true);
     if (allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
       return callback(null, true);
@@ -42,124 +71,22 @@ app.use(cors({
 }));
 app.use(express.json());
 
-// Database file paths
-const rentalDbPath = path.join(__dirname, 'database', 'rentals.json');
-const expenseDbPath = path.join(__dirname, 'database', 'expenses.json');
-const usersDbPath = path.join(__dirname, 'database', 'users.json');
-
-// Ensure database directory exists
-const dbDir = path.join(__dirname, 'database');
-if (!fs.existsSync(dbDir)) {
-  fs.mkdirSync(dbDir, { recursive: true });
-}
-
-// Initialize database files
-const initializeDb = () => {
-  if (!fs.existsSync(rentalDbPath)) {
-    fs.writeFileSync(rentalDbPath, JSON.stringify([], null, 2));
-  }
-  if (!fs.existsSync(expenseDbPath)) {
-    fs.writeFileSync(expenseDbPath, JSON.stringify([], null, 2));
-  }
-  if (!fs.existsSync(usersDbPath)) {
-    fs.writeFileSync(usersDbPath, JSON.stringify([
-      {
-        id: 'user1',
-        name: 'Mani',
-        email: 'mani@example.com',
-        phone: '+91XXXXXXXXXX',
-        notifyEmail: ''
-      },
-      {
-        id: 'user2',
-        name: 'Shankar',
-        email: 'shankar@example.com',
-        phone: '+91XXXXXXXXXX',
-        notifyEmail: ''
-      }
-    ], null, 2));
-  }
-};
-
-initializeDb();
-
-// Data Migration for rentals (userId -> userIds, add flatName)
-try {
-  if (fs.existsSync(rentalDbPath)) {
-    const rentals = JSON.parse(fs.readFileSync(rentalDbPath, 'utf8'));
-    let modified = false;
-    const migrated = rentals.map(r => {
-      if (r.userId && !r.userIds) {
-        r.userIds = [r.userId];
-        delete r.userId;
-        modified = true;
-      }
-      if (r.flatName === undefined) {
-        r.flatName = '';
-        modified = true;
-      }
-      return r;
-    });
-    if (modified) {
-      fs.writeFileSync(rentalDbPath, JSON.stringify(migrated, null, 2));
-    }
-  }
-} catch (err) {
-  console.error('Migration error:', err);
-}
-
-// Migrate users: add notifyEmail if missing
-try {
-  if (fs.existsSync(usersDbPath)) {
-    const users = JSON.parse(fs.readFileSync(usersDbPath, 'utf8'));
-    let modified = false;
-    const migrated = users.map(u => {
-      if (u.whatsappNumber !== undefined && u.notifyEmail === undefined) {
-        u.notifyEmail = u.email || '';
-        delete u.whatsappNumber;
-        modified = true;
-      } else if (u.notifyEmail === undefined) {
-        u.notifyEmail = u.email || '';
-        modified = true;
-      }
-      return u;
-    });
-    if (modified) {
-      fs.writeFileSync(usersDbPath, JSON.stringify(migrated, null, 2));
-    }
-  }
-} catch (err) {
-  console.error('User migration error:', err);
-}
-
-// Helper functions to read/write JSON
-const readRentals = () => JSON.parse(fs.readFileSync(rentalDbPath, 'utf8'));
-const writeRentals = (data) => fs.writeFileSync(rentalDbPath, JSON.stringify(data, null, 2));
-
-const readExpenses = () => JSON.parse(fs.readFileSync(expenseDbPath, 'utf8'));
-const writeExpenses = (data) => fs.writeFileSync(expenseDbPath, JSON.stringify(data, null, 2));
-
-const readUsers = () => JSON.parse(fs.readFileSync(usersDbPath, 'utf8'));
-const writeUsers = (data) => fs.writeFileSync(usersDbPath, JSON.stringify(data, null, 2));
-
 // ==================== RENTAL ROUTES ====================
 
 // Get all rentals
-app.get('/api/rentals', (req, res) => {
+app.get('/api/rentals', async (req, res) => {
   try {
-    const rentals = readRentals();
-    const sortedRentals = rentals.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-    res.json(sortedRentals);
+    const rentals = await Rental.find().sort({ createdAt: -1 });
+    res.json(rentals);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
 // Get rental by ID
-app.get('/api/rentals/:id', (req, res) => {
+app.get('/api/rentals/:id', async (req, res) => {
   try {
-    const rentals = readRentals();
-    const rental = rentals.find(r => r.id === req.params.id);
+    const rental = await Rental.findById(req.params.id);
     if (!rental) return res.status(404).json({ error: 'Rental not found' });
     res.json(rental);
   } catch (error) {
@@ -168,54 +95,47 @@ app.get('/api/rentals/:id', (req, res) => {
 });
 
 // Create new rental
-app.post('/api/rentals', (req, res) => {
+app.post('/api/rentals', async (req, res) => {
   try {
     const { flatNumber, flatName, startDate, endDate, rentAmount, advanceAmount, userIds } = req.body;
-    
+
     if (!flatNumber || !startDate || !endDate || !rentAmount || !userIds || !userIds.length) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    const rentals = readRentals();
-    const newRental = {
-      id: Date.now().toString(),
+    const rental = new Rental({
       flatNumber,
       flatName: flatName || '',
-       advanceAmount: advanceAmount || 0,
       startDate: new Date(startDate),
       endDate: new Date(endDate),
       rentAmount,
+      advanceAmount: advanceAmount || 0,
       userIds,
       rentHistory: [
         {
+          type: 'agreement',
           amount: rentAmount,
           date: new Date(),
           note: 'Initial agreement'
         }
       ],
-      status: 'active',
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
+      status: 'active'
+    });
 
-    rentals.push(newRental);
-    writeRentals(rentals);
-    res.status(201).json(newRental);
+    await rental.save();
+    res.status(201).json(rental);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
 // Update rental
-app.put('/api/rentals/:id', (req, res) => {
+app.put('/api/rentals/:id', async (req, res) => {
   try {
     const { flatNumber, flatName, startDate, endDate, rentAmount, status, userIds, isNewAgreement } = req.body;
-    const rentals = readRentals();
-    const rentalIndex = rentals.findIndex(r => r.id === req.params.id);
+    const rental = await Rental.findById(req.params.id);
 
-    if (rentalIndex === -1) return res.status(404).json({ error: 'Rental not found' });
-
-    const rental = rentals[rentalIndex];
+    if (!rental) return res.status(404).json({ error: 'Rental not found' });
 
     if (isNewAgreement) {
       rental.rentHistory.push({
@@ -258,20 +178,17 @@ app.put('/api/rentals/:id', (req, res) => {
     if (flatName !== undefined) rental.flatName = flatName;
     if (userIds && userIds.length > 0) rental.userIds = userIds;
 
-    rental.updatedAt = new Date();
-    rentals[rentalIndex] = rental;
-    writeRentals(rentals);
+    await rental.save();
     res.json(rental);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-// Get rent history for a flat
-app.get('/api/rentals/:id/history', (req, res) => {
+// Get rent history for a rental
+app.get('/api/rentals/:id/history', async (req, res) => {
   try {
-    const rentals = readRentals();
-    const rental = rentals.find(r => r.id === req.params.id);
+    const rental = await Rental.findById(req.params.id);
     if (!rental) return res.status(404).json({ error: 'Rental not found' });
     res.json(rental.rentHistory);
   } catch (error) {
@@ -282,29 +199,27 @@ app.get('/api/rentals/:id/history', (req, res) => {
 // ==================== EXPENSE ROUTES ====================
 
 // Get all expenses
-app.get('/api/expenses', (req, res) => {
+app.get('/api/expenses', async (req, res) => {
   try {
-    const expenses = readExpenses();
-    const sortedExpenses = expenses.sort((a, b) => new Date(b.date) - new Date(a.date));
-    res.json(sortedExpenses);
+    const expenses = await Expense.find().sort({ date: -1 });
+    res.json(expenses);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
 // Get expenses by flat
-app.get('/api/expenses/flat/:flatNumber', (req, res) => {
+app.get('/api/expenses/flat/:flatNumber', async (req, res) => {
   try {
-    const expenses = readExpenses();
-    const flatExpenses = expenses.filter(e => e.flatNumber === req.params.flatNumber);
-    res.json(flatExpenses.sort((a, b) => new Date(b.date) - new Date(a.date)));
+    const expenses = await Expense.find({ flatNumber: req.params.flatNumber }).sort({ date: -1 });
+    res.json(expenses);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
 // Create new expense
-app.post('/api/expenses', (req, res) => {
+app.post('/api/expenses', async (req, res) => {
   try {
     const { flatNumber, category, amount, description, userId, date } = req.body;
 
@@ -312,32 +227,26 @@ app.post('/api/expenses', (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    const expenses = readExpenses();
-    const newExpense = {
-      id: Date.now().toString(),
-      flatNumber,
+    const expense = new Expense({
+      flatNumber: flatNumber || '',
       category,
       amount,
       description: description || '',
       userId,
-      date: date ? new Date(date) : new Date(),
-      createdAt: new Date()
-    };
+      date: date ? new Date(date) : new Date()
+    });
 
-    expenses.push(newExpense);
-    writeExpenses(expenses);
-    res.status(201).json(newExpense);
+    await expense.save();
+    res.status(201).json(expense);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
 // Delete expense
-app.delete('/api/expenses/:id', (req, res) => {
+app.delete('/api/expenses/:id', async (req, res) => {
   try {
-    const expenses = readExpenses();
-    const filteredExpenses = expenses.filter(e => e.id !== req.params.id);
-    writeExpenses(filteredExpenses);
+    await Expense.findByIdAndDelete(req.params.id);
     res.json({ message: 'Expense deleted' });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -345,13 +254,12 @@ app.delete('/api/expenses/:id', (req, res) => {
 });
 
 // Get monthly expense summary
-app.get('/api/expenses/summary/:flatNumber', (req, res) => {
+app.get('/api/expenses/summary/:flatNumber', async (req, res) => {
   try {
-    const expenses = readExpenses();
-    const flatExpenses = expenses.filter(e => e.flatNumber === req.params.flatNumber);
-    
+    const expenses = await Expense.find({ flatNumber: req.params.flatNumber });
+
     const summary = {};
-    flatExpenses.forEach(exp => {
+    expenses.forEach(exp => {
       const monthKey = new Date(exp.date).toISOString().substring(0, 7);
       if (!summary[monthKey]) {
         summary[monthKey] = { total: 0, byCategory: {} };
@@ -369,9 +277,9 @@ app.get('/api/expenses/summary/:flatNumber', (req, res) => {
 // ==================== USER ROUTES ====================
 
 // Get all users
-app.get('/api/users', (req, res) => {
+app.get('/api/users', async (req, res) => {
   try {
-    const users = readUsers();
+    const users = await User.find();
     res.json(users);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -379,23 +287,32 @@ app.get('/api/users', (req, res) => {
 });
 
 // Update user contact info
-app.put('/api/users/:id', (req, res) => {
+app.put('/api/users/:id', async (req, res) => {
   try {
     const { name, email, phone, notifyEmail } = req.body;
-    const users = readUsers();
-    const userIndex = users.findIndex(u => u.id === req.params.id);
+    const user = await User.findById(req.params.id);
 
-    if (userIndex === -1) return res.status(404).json({ error: 'User not found' });
+    if (!user) return res.status(404).json({ error: 'User not found' });
 
-    const user = users[userIndex];
     if (name) user.name = name;
     if (email) user.email = email;
     if (phone) user.phone = phone;
     if (notifyEmail !== undefined) user.notifyEmail = notifyEmail;
 
-    users[userIndex] = user;
-    writeUsers(users);
+    await user.save();
     res.json(user);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ==================== RESET ROUTE (temporary — delete after cleanup) ====================
+
+// DELETE /api/reset/rentals  → wipes all rentals from MongoDB
+app.delete('/api/reset/rentals', async (req, res) => {
+  try {
+    await Rental.deleteMany({});
+    res.json({ message: '✅ All rentals deleted from MongoDB' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -446,17 +363,17 @@ const sendEmailReminder = async (rental, user) => {
         <div style="background: white; padding: 24px; border-radius: 0 0 8px 8px; border: 1px solid #e0e0e0;">
           <p style="font-size: 18px; color: #333;">Dear <strong>${user.name}</strong>,</p>
           <p style="font-size: 16px; color: #555;">Your rental agreement is ending in <strong style="color: #e74c3c;">2 days</strong>.</p>
-          
+
           <div style="background: #f5f5f5; padding: 16px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #2c3e50;">
             <p style="margin: 8px 0; font-size: 16px;"><strong>📍 Property:</strong> ${flatStr}</p>
             <p style="margin: 8px 0; font-size: 16px;"><strong>💰 Monthly Rent:</strong> ₹${rentStr}</p>
             <p style="margin: 8px 0; font-size: 16px;"><strong>📅 Agreement Ends:</strong> ${endDateStr}</p>
           </div>
-          
+
           <p style="font-size: 16px; color: #555;">Please log in to the Rental Tracker app to review and renew your agreement if needed.</p>
-          
+
           <p style="font-size: 14px; color: #999; margin-top: 30px; border-top: 1px solid #eee; padding-top: 15px;">
-            This is an automated reminder from your Rental & Expense Tracker.
+            This is an automated reminder from your Rental &amp; Expense Tracker.
           </p>
         </div>
       </div>
@@ -482,8 +399,8 @@ const sendEmailReminder = async (rental, user) => {
 cron.schedule('0 * * * *', async () => {
   console.log(`\n⏰ [${new Date().toLocaleString()}] Checking for upcoming rental reminders...`);
   try {
-    const rentals = readRentals();
-    const users = readUsers();
+    const rentals = await Rental.find({ status: 'active' });
+    const users = await User.find();
 
     rentals.forEach(rental => {
       const endDate = new Date(rental.endDate);
@@ -492,10 +409,8 @@ cron.schedule('0 * * * *', async () => {
 
       if (daysUntilEnd === 2 && rental.userIds) {
         rental.userIds.forEach(uid => {
-          const user = users.find(u => u.id === uid);
-          if (user) {
-            sendEmailReminder(rental, user);
-          }
+          const user = users.find(u => u._id === uid);
+          if (user) sendEmailReminder(rental, user);
         });
       }
     });
@@ -507,16 +422,17 @@ cron.schedule('0 * * * *', async () => {
 // Manual trigger endpoint (for testing)
 app.post('/api/test-reminder/:rentalId', async (req, res) => {
   try {
-    const rentals = readRentals();
-    const users = readUsers();
-    const rental = rentals.find(r => r.id === req.params.rentalId);
+    const rental = await Rental.findById(req.params.rentalId);
     if (!rental) return res.status(404).json({ error: 'Rental not found' });
 
+    const users = await User.find();
     const results = [];
+
     for (const uid of rental.userIds || []) {
-      const user = users.find(u => u.id === uid);
+      const user = users.find(u => u._id === uid);
       if (user) {
-        await sendEmailReminder(rental, user);        results.push({ user: user.name, email: user.notifyEmail || user.email });
+        await sendEmailReminder(rental, user);
+        results.push({ user: user.name, email: user.notifyEmail || user.email });
       }
     }
     res.json({ message: 'Test reminder triggered', results });
@@ -531,31 +447,37 @@ app.get('/api/health', (req, res) => {
   const transporter = createTransporter();
   res.json({
     status: 'Server is running',
+    database: mongoose.connection.readyState === 1 ? '✅ MongoDB connected' : '❌ MongoDB disconnected',
     emailConfigured: !!transporter,
     smtpUser: process.env.SMTP_USER ? `${process.env.SMTP_USER.substring(0, 3)}***` : 'not set'
   });
 });
 
-// Start server
-app.listen(PORT, () => {
+// ==================== START SERVER ====================
+
+app.listen(PORT, async () => {
   console.log('\n' + '='.repeat(60));
   console.log('🚀 Rental & Expense Tracker - Backend Server');
   console.log('='.repeat(60));
   console.log(`📍 Server running on: http://localhost:${PORT}`);
   console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log('');
+
+  await seedUsers();
+
+  console.log('');
   console.log('📚 API Endpoints:');
-  console.log('  GET  /api/rentals              - Get all rentals');
-  console.log('  POST /api/rentals              - Create rental');
-  console.log('  GET  /api/rentals/:id          - Get rental details');
-  console.log('  PUT  /api/rentals/:id          - Update rental');
-  console.log('  GET  /api/rentals/:id/history  - Get rent history');
-  console.log('  GET  /api/expenses             - Get all expenses');
-  console.log('  POST /api/expenses             - Create expense');
-  console.log('  DEL  /api/expenses/:id         - Delete expense');
-  console.log('  GET  /api/users                - Get all users');
-  console.log('  PUT  /api/users/:id            - Update user');
-  console.log('  POST /api/test-reminder/:id    - Test email reminder');
+  console.log('  GET    /api/rentals              - Get all rentals');
+  console.log('  POST   /api/rentals              - Create rental');
+  console.log('  GET    /api/rentals/:id          - Get rental details');
+  console.log('  PUT    /api/rentals/:id          - Update rental');
+  console.log('  GET    /api/rentals/:id/history  - Get rent history');
+  console.log('  GET    /api/expenses             - Get all expenses');
+  console.log('  POST   /api/expenses             - Create expense');
+  console.log('  DELETE /api/expenses/:id         - Delete expense');
+  console.log('  GET    /api/users                - Get all users');
+  console.log('  PUT    /api/users/:id            - Update user');
+  console.log('  DELETE /api/reset/rentals        - ⚠️  Wipe all rentals (temp)');
   console.log('');
   console.log(`📧 Email Notifications: ${process.env.SMTP_USER ? '✅ Configured' : '⚠️  Not configured (add SMTP_* to .env)'}`);
   console.log('⏰ Reminder Check: Every hour at :00');
