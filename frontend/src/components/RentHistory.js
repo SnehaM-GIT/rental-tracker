@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import API_BASE from '../utils/api';
 
 const RentHistory = ({ rentalId }) => {
   const [history, setHistory] = useState([]);
@@ -11,7 +12,7 @@ const RentHistory = ({ rentalId }) => {
 
   const fetchHistory = async () => {
     try {
-      const response = await fetch(`/api/rentals/${rentalId}/history`);
+      const response = await fetch(`${API_BASE}/api/rentals/${rentalId}/history`);
       const data = await response.json();
       setHistory(data);
     } catch (error) {

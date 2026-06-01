@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import RentHistory from './RentHistory';
+import API_BASE from '../utils/api';
 
 const RentalDetails = ({ rental, users, onClose, onUpdate }) => {
   const [isEditing, setIsEditing] = useState(false);
@@ -40,7 +41,7 @@ const RentalDetails = ({ rental, users, onClose, onUpdate }) => {
     setMessage('');
 
     try {
-      const response = await fetch(`/api/rentals/${rental.id}`, {
+      const response = await fetch(`${API_BASE}/api/rentals/${rental.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

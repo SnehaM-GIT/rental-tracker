@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import API_BASE from './utils/api';
 import './styles/App.css';
 import RentalForm from './components/RentalForm';
 import RentalList from './components/RentalList';
@@ -28,7 +29,7 @@ function App() {
 
   const fetchUsers = async () => {
     try {
-      const response = await fetch('/api/users');
+      const response = await fetch(`${API_BASE}/api/users`);
       const data = await response.json();
       setUsers(data);
       if (data.length > 0) {

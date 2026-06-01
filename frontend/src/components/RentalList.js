@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import RentalDetails from './RentalDetails';
+import API_BASE from '../utils/api';
 
 const RentalList = ({ currentUser, users }) => {
   const [rentals, setRentals] = useState([]);
@@ -13,7 +14,7 @@ const RentalList = ({ currentUser, users }) => {
 
   const fetchRentals = async () => {
     try {
-      const response = await fetch('/api/rentals');
+      const response = await fetch(`${API_BASE}/api/rentals`);
       const data = await response.json();
       const userRentals = data.filter(r => r.userIds && r.userIds.includes(currentUser));
       setRentals(userRentals);

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import API_BASE from '../utils/api';
 
 const UserSettings = ({ userId, onUpdate }) => {
   const [formData, setFormData] = useState({
@@ -17,7 +18,7 @@ const UserSettings = ({ userId, onUpdate }) => {
 
   const fetchUserData = async () => {
     try {
-      const response = await fetch('/api/users');
+      const response = await fetch(`${API_BASE}/api/users`);
       const users = await response.json();
       const user = users.find(u => u.id === userId);
       if (user) {
@@ -49,7 +50,7 @@ const UserSettings = ({ userId, onUpdate }) => {
     setMessage('');
 
     try {
-      const response = await fetch(`/api/users/${userId}`, {
+      const response = await fetch(`${API_BASE}/api/users/${userId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)

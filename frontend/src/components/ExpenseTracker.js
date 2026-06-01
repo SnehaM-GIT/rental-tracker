@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import API_BASE from '../utils/api';
 
 const ExpenseTracker = ({ currentUser, users }) => {
   const [expenses, setExpenses] = useState([]);
@@ -22,7 +23,7 @@ const ExpenseTracker = ({ currentUser, users }) => {
 
   const fetchRentals = async () => {
     try {
-      const response = await fetch('/api/rentals');
+      const response = await fetch(`${API_BASE}/api/rentals`);
       const data = await response.json();
       const userRentals = data.filter(r => r.userIds && r.userIds.includes(currentUser));
       setRentals(userRentals);
@@ -34,8 +35,8 @@ const ExpenseTracker = ({ currentUser, users }) => {
   const fetchExpenses = async () => {
     try {
       const [expRes, rentRes] = await Promise.all([
-        fetch('/api/expenses'),
-        fetch('/api/rentals')
+        fetch(`${API_BASE}/api/expenses`),
+        fetch(`${API_BASE}/api/rentals`)
       ]);
       const expensesData = await expRes.json();
       const rentalsData = await rentRes.json();
@@ -64,7 +65,7 @@ const ExpenseTracker = ({ currentUser, users }) => {
     setMessage('');
 
     try {
-      const response = await fetch('/api/expenses', {
+      const response = await fetch(`${API_BASE}/api/expenses`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -98,7 +99,7 @@ const ExpenseTracker = ({ currentUser, users }) => {
   const handleDelete = async (expenseId) => {
     if (window.confirm('Are you sure you want to delete this expense?')) {
       try {
-        const response = await fetch(`/api/expenses/${expenseId}`, {
+        const response = await fetch(`${API_BASE}/api/expenses/${expenseId}`, {
           method: 'DELETE'
         });
         if (response.ok) {

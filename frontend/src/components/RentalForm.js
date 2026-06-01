@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import API_BASE from '../utils/api';
 
 const RentalForm = ({ currentUser, users, onSuccess }) => {
   const [formData, setFormData] = useState({
@@ -32,7 +33,7 @@ const handleSubmit = async (e) => {
   setMessage('');
 
   try {
-    const response = await fetch('/api/rentals', {
+    const response = await fetch(`${API_BASE}/api/rentals`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

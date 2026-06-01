@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import API_BASE from '../utils/api';
 import RentalList from './RentalList';
 
 const Dashboard = ({ currentUser, users }) => {
@@ -18,11 +19,11 @@ const Dashboard = ({ currentUser, users }) => {
 
   const fetchStats = async () => {
     try {
-      const rentalsRes = await fetch('/api/rentals');
+      const rentalsRes = await fetch(`${API_BASE}/api/rentals`);
       const rentalsData = await rentalsRes.json();
       const userRentals = rentalsData.filter(r => r.userIds && r.userIds.includes(currentUser));
 
-      const expensesRes = await fetch('/api/expenses');
+      const expensesRes = await fetch(`${API_BASE}/api/expenses`);
       const expensesData = await expensesRes.json();
       const userFlatNumbers = userRentals.map(r => r.flatNumber);
       const userExpenses = expensesData.filter(e =>
