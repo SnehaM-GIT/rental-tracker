@@ -6,27 +6,6 @@ const RentalList = ({ currentUser, users }) => {
   const [rentals, setRentals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedRental, setSelectedRental] = useState(null);
-  const [expandedFlatKeys, setExpandedFlatKeys] = useState(new Set());
-
-  const flatGroupKey = (rental) => `${rental.flatName || 'Flat'}|${rental.flatNumber}`;
-
-  const isExpiredRental = (rental) => {
-    const end = new Date(rental.endDate);
-    const today = new Date();
-    return end < today;
-  };
-
-  const toggleExpired = (flatKey) => {
-    setExpandedFlatKeys((prev) => {
-      const next = new Set(prev);
-      if (next.has(flatKey)) {
-        next.delete(flatKey);
-      } else {
-        next.add(flatKey);
-      }
-      return next;
-    });
-  };
 
 // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -91,135 +70,47 @@ const RentalList = ({ currentUser, users }) => {
             </tr>
           </thead>
           <tbody>
-            {(() => {
-              const activeRentals = rentals
-                .filter(r => !isExpiredRental(r))
-                .sort((a, b) => new Date(a.endDate) - new Date(b.endDate));
-
-              const expiredRentals = rentals.filter(isExpiredRental);
-              const expiredByFlat = expiredRentals.reduce((map, rental) => {
-                const key = flatGroupKey(rental);
-                if (!map[key]) map[key] = [];
-                map[key].push(rental);
-                return map;
-              }, {});
-
-              if (activeRentals.length === 0) {
-                return (
-                  <tr>
-                    <td colSpan="10" className="empty-state">
-                      No active rental agreements found. Select an expired agreement below to view details.
-                    </td>
-                  </tr>
-                );
-              }
-
-              return activeRentals.map((rental, index) => {
-                const daysUntilEnd = getDaysUntilEnd(rental.endDate);
-                const status = getStatus(daysUntilEnd);
-                const key = flatGroupKey(rental);
-                const expiredForFlat = expiredByFlat[key] || [];
-                const isExpanded = expandedFlatKeys.has(key);
-
-                return (
-                  <React.Fragment key={rental.id}>
-                    <tr
-                      onClick={() => setSelectedRental(rental)}
-                      className="rental-table-row"
+            {rentals.map((rental, index) => {
+              const daysUntilEnd = getDaysUntilEnd(rental.endDate);
+              const status = getStatus(daysUntilEnd);
+              return (
+                <tr
+                  key={rental.id}
+                  onClick={() => setSelectedRental(rental)}
+                  className="rental-table-row"
+                >
+                  <td className="col-index">{index + 1}</td>
+                  <td className="col-name">
+                    {rental.flatName || '—'}
+                  </td>
+                  <td className="col-flat">
+                    <strong>{rental.flatNumber}</strong>
+                  </td>
+                  <td className="col-rent">
+                    ₹{rental.rentAmount.toLocaleString('en-IN')}
+                  </td>
+                  <td className="col-date">{fmtDate(rental.startDate)}</td>
+                  <td className="col-date">{fmtDate(rental.endDate)}</td>
+                  <td className="col-days" style={{ color: status.color, fontWeight: 700 }}>
+                    {daysUntilEnd < 0 ? 'Expired' : `${daysUntilEnd}d`}
+                  </td>
+                  <td className="col-status">
+                    <span className="status-pill" style={{ color: status.color, background: status.bg }}>
+                      {status.label}
+                    </span>
+                  </td>
+                  <td className="col-action">
+                    <button
+                      className="btn-secondary"
+                      style={{ padding: '8px 14px', fontSize: '14px', minHeight: '36px' }}
+                      onClick={(e) => { e.stopPropagation(); setSelectedRental(rental); }}
                     >
-                      <td className="col-index">{index + 1}</td>
-                      <td className="col-name">
-                        {rental.flatName || '—'}
-                      </td>
-                      <td className="col-flat">
-                        <strong>{rental.flatNumber}</strong>
-                      </td>
-                      <td className="col-rent">
-                        ₹{rental.rentAmount.toLocaleString('en-IN')}
-                      </td>
-                      <td className="col-date">
-                        {rental.advanceAmount ? `₹${rental.advanceAmount.toLocaleString('en-IN')}` : '—'}
-                      </td>
-                      <td className="col-date">{fmtDate(rental.startDate)}</td>
-                      <td className="col-date">{fmtDate(rental.endDate)}</td>
-                      <td className="col-days" style={{ color: status.color, fontWeight: 700 }}>
-                        {daysUntilEnd < 0 ? 'Expired' : `${daysUntilEnd}d`}
-                      </td>
-                      <td className="col-status">
-                        <span className="status-pill" style={{ color: status.color, background: status.bg }}>
-                          {status.label}
-                        </span>
-                      </td>
-                      <td className="col-action">
-                        {expiredForFlat.length > 0 && (
-                          <button
-                            type="button"
-                            className="expired-toggle-btn"
-                            onClick={(e) => { e.stopPropagation(); toggleExpired(key); }}
-                            aria-expanded={isExpanded}
-                            aria-controls={`expired-group-${encodeURIComponent(key)}`}
-                          >
-                            {isExpanded ? 'Hide history' : `${expiredForFlat.length} expired`}
-                          </button>
-                        )}
-                        <button
-                          className="btn-secondary"
-                          style={{ padding: '8px 14px', fontSize: '14px', minHeight: '36px', marginTop: expiredForFlat.length > 0 ? '8px' : 0 }}
-                          onClick={(e) => { e.stopPropagation(); setSelectedRental(rental); }}
-                        >
-                          View
-                        </button>
-                      </td>
-                    </tr>
-
-                    {isExpanded && expiredForFlat.length > 0 && (
-                      <tr className="expired-group-row" id={`expired-group-${encodeURIComponent(key)}`}>
-                        <td colSpan="10">
-                          <div className="expired-group-panel">
-                            <div className="expired-group-header">
-                              Expired agreements for {rental.flatName ? `${rental.flatName} — ` : ''}Flat {rental.flatNumber}
-                            </div>
-                            <div className="expired-card-list">
-                              {expiredForFlat.map((expiredRental, idx) => {
-                                const expiredDays = getDaysUntilEnd(expiredRental.endDate);
-                                const expiredStatus = getStatus(expiredDays);
-                                return (
-                                  <div
-                                    key={expiredRental.id}
-                                    className="expired-card"
-                                    onClick={() => setSelectedRental(expiredRental)}
-                                  >
-                                    <div className="expired-card-info">
-                                      <div><strong>Agreement {idx + 1}</strong></div>
-                                      <div className="expired-card-meta">
-                                        <span>{expiredRental.flatName || `Flat ${expiredRental.flatNumber}`}</span>
-                                        <span>{fmtDate(expiredRental.startDate)} → {fmtDate(expiredRental.endDate)}</span>
-                                      </div>
-                                    </div>
-                                    <div className="expired-card-meta expired-card-actions">
-                                      <span className="status-pill" style={{ color: expiredStatus.color, background: expiredStatus.bg }}>
-                                        {expiredStatus.label}
-                                      </span>
-                                      <button
-                                        type="button"
-                                        className="btn-secondary"
-                                        onClick={(e) => { e.stopPropagation(); setSelectedRental(expiredRental); }}
-                                      >
-                                        View
-                                      </button>
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                  </React.Fragment>
-                );
-              });
-            })()}
+                      View
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
