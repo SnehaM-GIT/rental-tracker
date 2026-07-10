@@ -33,11 +33,28 @@ function App() {
       const data = await response.json();
       setUsers(data);
       if (data.length > 0) {
-        setCurrentUser(data[0].id);
+        const savedUser = localStorage.getItem('currentUser');
+        const maniUser = data.find(u => u.name.toLowerCase().includes('mani'));
+        
+        if (savedUser && data.some(u => u.id === savedUser)) {
+          setCurrentUser(savedUser);
+        } else if (maniUser) {
+          setCurrentUser(maniUser.id);
+          localStorage.setItem('currentUser', maniUser.id);
+        } else {
+          setCurrentUser(data[0].id);
+          localStorage.setItem('currentUser', data[0].id);
+        }
       }
     } catch (error) {
       console.error('Error fetching users:', error);
     }
+  };
+
+  const handleUserChange = (e) => {
+    const userId = e.target.value;
+    setCurrentUser(userId);
+    localStorage.setItem('currentUser', userId);
   };
 
   const handleInstall = async () => {
@@ -85,7 +102,7 @@ function App() {
             <select
               id="user-select"
               value={currentUser}
-              onChange={(e) => setCurrentUser(e.target.value)}
+              onChange={handleUserChange}
               className="user-dropdown"
             >
               {users.map(user => (

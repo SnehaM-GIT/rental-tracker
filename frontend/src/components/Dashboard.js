@@ -38,10 +38,17 @@ const Dashboard = ({ currentUser, users }) => {
       const today = new Date();
       let endingSoonCount = 0;
       const reminders = [];
+      let activeCount = 0;
+      let activeMonthlyRent = 0;
 
       userRentals.forEach(rental => {
         const endDate = new Date(rental.endDate);
         const daysUntilEnd = Math.floor((endDate - today) / (1000 * 60 * 60 * 24));
+
+        if (daysUntilEnd >= 0) {
+          activeCount++;
+          activeMonthlyRent += rental.rentAmount;
+        }
 
         if (daysUntilEnd <= 7 && daysUntilEnd >= 0) {
           endingSoonCount++;
@@ -56,8 +63,8 @@ const Dashboard = ({ currentUser, users }) => {
 
       setStats({
         totalRentals: userRentals.length,
-        totalMonthlyRent: userRentals.reduce((sum, r) => sum + r.rentAmount, 0),
-        activeRentals: userRentals.filter(r => r.status === 'active').length,
+        totalMonthlyRent: activeMonthlyRent,
+        activeRentals: activeCount,
         endingSoon: endingSoonCount,
         monthlyExpenses: currentMonthExpenses.reduce((sum, e) => sum + e.amount, 0)
       });

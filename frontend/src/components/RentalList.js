@@ -6,7 +6,7 @@ const RentalList = ({ currentUser, users }) => {
   const [rentals, setRentals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedRental, setSelectedRental] = useState(null);
-  const [expandedFlats, setExpandedFlats] = useState(new Set());
+  const [historyFlat, setHistoryFlat] = useState(null);
 
 // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -44,12 +44,11 @@ const RentalList = ({ currentUser, users }) => {
 
   const toggleFlat = (flatNumber, e) => {
     e.stopPropagation();
-    setExpandedFlats(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(flatNumber)) newSet.delete(flatNumber);
-      else newSet.add(flatNumber);
-      return newSet;
-    });
+    setHistoryFlat(flatNumber);
+  };
+
+  const closeHistory = () => {
+    setHistoryFlat(null);
   };
 
   const groupedRentals = useMemo(() => {
@@ -100,98 +99,103 @@ const RentalList = ({ currentUser, users }) => {
               const historyRentals = flatRentals.slice(1);
               const daysUntilEnd = getDaysUntilEnd(activeRental.endDate);
               const status = getStatus(daysUntilEnd);
-              const isExpanded = expandedFlats.has(flatNumber);
 
               return (
-                <React.Fragment key={flatNumber}>
-                  <tr
-                    onClick={() => setSelectedRental(activeRental)}
-                    className="rental-table-row active-row"
-                  >
-                    <td className="col-index">{index + 1}</td>
-                    <td className="col-name">{activeRental.flatName || '—'}</td>
-                    <td className="col-flat">
-                      <strong>{flatNumber}</strong>
-                    </td>
-                    <td className="col-rent">
-                      ₹{activeRental.rentAmount.toLocaleString('en-IN')}
-                    </td>
-                    <td className="col-date">{fmtDate(activeRental.startDate)}</td>
-                    <td className="col-date">{fmtDate(activeRental.endDate)}</td>
-                    <td className="col-days" style={{ color: status.color, fontWeight: 700 }}>
-                      {daysUntilEnd < 0 ? 'Expired' : `${daysUntilEnd}d`}
-                    </td>
-                    <td className="col-status">
-                      <span className="status-pill" style={{ color: status.color, background: status.bg }}>
-                        {status.label}
-                      </span>
-                    </td>
-                    <td className="col-action">
-                      {historyRentals.length > 0 && (
-                        <button
-                          className="btn-secondary"
-                          style={{ padding: '4px 8px', fontSize: '12px', marginRight: '8px' }}
-                          onClick={(e) => toggleFlat(flatNumber, e)}
-                        >
-                          {isExpanded ? 'Hide History' : `History (${historyRentals.length})`}
-                        </button>
-                      )}
+                <tr
+                  key={flatNumber}
+                  onClick={() => setSelectedRental(activeRental)}
+                  className="rental-table-row active-row"
+                >
+                  <td className="col-index">{index + 1}</td>
+                  <td className="col-name">{activeRental.flatName || '—'}</td>
+                  <td className="col-flat">
+                    <strong>{flatNumber}</strong>
+                  </td>
+                  <td className="col-rent">
+                    ₹{activeRental.rentAmount.toLocaleString('en-IN')}
+                  </td>
+                  <td className="col-date">{fmtDate(activeRental.startDate)}</td>
+                  <td className="col-date">{fmtDate(activeRental.endDate)}</td>
+                  <td className="col-days" style={{ color: status.color, fontWeight: 700 }}>
+                    {daysUntilEnd < 0 ? 'Expired' : `${daysUntilEnd}d`}
+                  </td>
+                  <td className="col-status">
+                    <span className="status-pill" style={{ color: status.color, background: status.bg }}>
+                      {status.label}
+                    </span>
+                  </td>
+                  <td className="col-action">
+                    {historyRentals.length > 0 && (
                       <button
                         className="btn-secondary"
-                        style={{ padding: '8px 14px', fontSize: '14px', minHeight: '36px' }}
-                        onClick={(e) => { e.stopPropagation(); setSelectedRental(activeRental); }}
+                        style={{ padding: '4px 8px', fontSize: '12px', marginRight: '8px' }}
+                        onClick={(e) => toggleFlat(flatNumber, e)}
                       >
-                        View
+                        History ({historyRentals.length})
                       </button>
-                    </td>
-                  </tr>
-                  
-                  {isExpanded && historyRentals.map((rental, hIndex) => {
-                    const hDays = getDaysUntilEnd(rental.endDate);
-                    const hStatus = getStatus(hDays);
-                    return (
-                      <tr
-                        key={rental.id}
-                        onClick={() => setSelectedRental(rental)}
-                        className="rental-table-row history-row"
-                        style={{ backgroundColor: '#f9fafb' }}
-                      >
-                        <td className="col-index">↳ {hIndex + 1}</td>
-                        <td className="col-name">{rental.flatName || '—'}</td>
-                        <td className="col-flat">
-                          <strong>{rental.flatNumber}</strong>
-                        </td>
-                        <td className="col-rent">
-                          ₹{rental.rentAmount.toLocaleString('en-IN')}
-                        </td>
-                        <td className="col-date">{fmtDate(rental.startDate)}</td>
-                        <td className="col-date">{fmtDate(rental.endDate)}</td>
-                        <td className="col-days" style={{ color: hStatus.color, fontWeight: 700 }}>
-                          {hDays < 0 ? 'Expired' : `${hDays}d`}
-                        </td>
-                        <td className="col-status">
-                          <span className="status-pill" style={{ color: hStatus.color, background: hStatus.bg, opacity: 0.8 }}>
-                            {hStatus.label}
-                          </span>
-                        </td>
-                        <td className="col-action">
-                          <button
-                            className="btn-secondary"
-                            style={{ padding: '8px 14px', fontSize: '14px', minHeight: '36px' }}
-                            onClick={(e) => { e.stopPropagation(); setSelectedRental(rental); }}
-                          >
-                            View
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </React.Fragment>
+                    )}
+                    <button
+                      className="btn-secondary"
+                      style={{ padding: '8px 14px', fontSize: '14px', minHeight: '36px' }}
+                      onClick={(e) => { e.stopPropagation(); setSelectedRental(activeRental); }}
+                    >
+                      View
+                    </button>
+                  </td>
+                </tr>
               );
             })}
           </tbody>
         </table>
       </div>
+
+      {/* History Modal */}
+      {historyFlat && (
+        <div className="modal-overlay" onClick={closeHistory}>
+          <div className="modal-content" style={{ maxWidth: '800px' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>📜 History for Flat {historyFlat}</h2>
+              <button className="close-btn" onClick={closeHistory}>✕</button>
+            </div>
+            <div className="rental-table-wrapper" style={{ marginTop: '20px' }}>
+              <table className="rental-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Start Date</th>
+                    <th>End Date</th>
+                    <th>Rent</th>
+                    <th>Status</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {groupedRentals[historyFlat].slice(1).map((rental, hIndex) => {
+                    const hDays = getDaysUntilEnd(rental.endDate);
+                    const hStatus = getStatus(hDays);
+                    return (
+                      <tr key={rental.id} onClick={() => { setSelectedRental(rental); closeHistory(); }} className="rental-table-row">
+                        <td>{hIndex + 1}</td>
+                        <td>{fmtDate(rental.startDate)}</td>
+                        <td>{fmtDate(rental.endDate)}</td>
+                        <td>₹{rental.rentAmount.toLocaleString('en-IN')}</td>
+                        <td>
+                          <span className="status-pill" style={{ color: hStatus.color, background: hStatus.bg }}>
+                            {hStatus.label}
+                          </span>
+                        </td>
+                        <td>
+                          <button className="btn-secondary" style={{ padding: '4px 8px', fontSize: '12px' }}>View</button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
 
       {selectedRental && (
         <RentalDetails
