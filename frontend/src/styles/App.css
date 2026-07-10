@@ -1225,3 +1225,6 @@ body {
     display: none;
   }
 }
+/* Active Rental Dashboard Styles */
+.history-row { background-color: #f9fafb; transition: all 0.3s; }
+.active-row { font-weight: 500; }

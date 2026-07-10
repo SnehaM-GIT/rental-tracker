@@ -51,7 +51,8 @@ const RentalList = ({ currentUser, users }) => {
 
   return (
     <div className="rental-list-container">
-      <h2>Your Rental Agreements</h2>
+      {/* Dashboard Rentals View */}
+      <h2>🏠 Your Active Flats</h2>
 
       <div className="rental-table-wrapper">
         <table className="rental-table">
