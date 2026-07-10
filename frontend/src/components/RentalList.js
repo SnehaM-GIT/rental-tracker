@@ -75,7 +75,8 @@ const RentalList = ({ currentUser, users }) => {
 
   return (
     <div className="rental-list-container">
-      <h2>Your Rental Agreements</h2>
+      {/* Dashboard Rentals View */}
+      <h2>🏠 Your Active Flats</h2>
 
       <div className="rental-table-wrapper">
         <table className="rental-table">
@@ -93,7 +94,7 @@ const RentalList = ({ currentUser, users }) => {
               <th></th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="styled-tbody">
             {Object.entries(groupedRentals).map(([flatNumber, flatRentals], index) => {
               const activeRental = flatRentals[0];
               const historyRentals = flatRentals.slice(1);
