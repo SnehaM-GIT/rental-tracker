@@ -70,8 +70,8 @@ const RentalList = ({ currentUser, users }) => {
               <th></th>
             </tr>
           </thead>
-          <tbody>
-            {rentals.map((rental, index) => {
+          <tbody className="styled-tbody">
+            {rentals.map((rental, idx) => {
               const daysUntilEnd = getDaysUntilEnd(rental.endDate);
               const status = getStatus(daysUntilEnd);
               return (
